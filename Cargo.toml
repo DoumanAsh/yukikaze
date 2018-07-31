@@ -1,0 +1,48 @@
+[package]
+name = "yukikaze"
+version = "0.1.0"
+authors = ["Douman <douman@gmx.se>"]
+description = "Beautiful and cute HTTP client library."
+repository = "https://gitlab.com/Douman/yukikaze"
+license = "Apache-2.0"
+keywords = ["http", "http-client"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+
+[dependencies.hyper]
+version = "0.12"
+default-features = false
+
+[dependencies]
+hyper-rustls = "0.14"
+tokio = "0.1"
+bytes = "0.4"
+futures = "0.1"
+
+http = "0.1"
+cookie = "0.11"
+percent-encoding = "1"
+etag = "1"
+
+data-encoding = "2"
+
+serde = "1"
+serde_json = "1"
+serde_urlencoded = "0.5"
+
+flate2 = { version = "^1.0.2", optional = true, default-features = false }
+
+[package.metadata.docs.rs]
+features = ["flate2-c"]
+
+[features]
+default = ["flate2-c"]
+
+# miniz-sys backend for flate2 crate
+flate2-c = ["flate2/miniz-sys"]
+
+# rust backend for flate2 crate
+flate2-rust = ["flate2/rust_backend"]
