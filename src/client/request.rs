@@ -97,7 +97,7 @@ impl Builder {
     pub fn new(uri: hyper::Uri, method: hyper::Method) -> Self {
         //Workaround to get just Parts as it is more  convenient
         //to modify Parts as you can take out elements
-        let mut temp = HyperRequest::new(hyper::Body::empty());
+        let mut temp = hyper::Request::<()>::new(());
         mem::replace(temp.method_mut(), method);
         mem::replace(temp.uri_mut(), uri);
 
