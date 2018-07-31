@@ -17,6 +17,8 @@ use ::http;
 use ::futures;
 use ::futures::{Future, Stream};
 use ::bytes;
+use ::serde_json;
+use ::serde::de::DeserializeOwned;
 
 //The size of buffer to use by default.
 const BUFFER_SIZE: usize = 4096;
@@ -68,10 +70,19 @@ pub enum BodyReadError {
     Overflow,
     ///Unable to decode body as UTF-8
     EncodingError,
+    ///Json serialization error.
+    JsonError(serde_json::error::Error),
     ///Error happened during deflate decompression.
     DeflateError(io::Error),
     ///Error happened during gzip decompression.
     GzipError(io::Error),
+}
+
+impl From<serde_json::error::Error> for BodyReadError {
+    #[inline]
+    fn from(error: serde_json::error::Error) -> Self {
+        BodyReadError::JsonError(error)
+    }
 }
 
 impl From<string::FromUtf8Error> for BodyReadError {
@@ -95,6 +106,15 @@ enum BodyType {
 }
 
 ///Reads raw bytes from HTTP Response
+///
+///The extractor provides way to read plain response's body or
+///compressed one.
+///
+///The method with which to read body determined by `Content-Encoding` header.
+///
+///Note that `ContentEncoding::Deflate` may have potential problem with particular
+///way to compress it. For example httpbin `/deflate` endpoint compresses the data
+///in unsupported by `flate2` crate way. Relevant [issue](https://github.com/requests/httpbin/issues/419)
 pub struct RawBody {
     parts: http::response::Parts,
     body: BodyType,
@@ -127,6 +147,25 @@ impl RawBody {
             body,
             limit: DEFEAULT_LIMIT,
         }
+    }
+
+    #[inline]
+    ///Disables decompression.
+    pub fn no_decompress(mut self) -> Self {
+        if let &BodyType::Plain(_, _) = &self.body {
+            return self
+        }
+
+        let body = match self.body {
+            #[cfg(feature = "flate2")]
+            BodyType::Deflate(body, _) => body,
+            #[cfg(feature = "flate2")]
+            BodyType::Gzip(body, _) => body,
+            BodyType::Plain(_, _) => unreachable!(),
+        };
+
+        self.body = BodyType::Plain(body, bytes::BytesMut::with_capacity(BUFFER_SIZE));
+        self
     }
 
     #[inline]
@@ -217,7 +256,7 @@ impl Future for RawBody {
     }
 }
 
-///Reads raw bytes from HTTP Response
+///Reads String from HTTP Response.
 pub enum Text {
     #[doc(hidden)]
     Init(Option<RawBody>),
@@ -275,3 +314,60 @@ impl Future for Text {
     }
 }
 
+///Reads raw bytes from HTTP Response and deserializes as JSON struct
+pub enum Json<J> {
+    #[doc(hidden)]
+    Init(Option<RawBody>),
+    #[doc(hidden)]
+    Future(futures::AndThen<RawBody, Result<J, BodyReadError>, fn(bytes::Bytes) -> Result<J, BodyReadError>>)
+}
+
+impl<J: DeserializeOwned> Json<J> {
+    ///Creates new instance.
+    pub fn new(response: super::Response) -> Self {
+        Json::Init(Some(RawBody::new(response)))
+    }
+
+    #[inline]
+    ///Retrieves length of content to receive, if `Content-Length` exists.
+    pub fn content_len(&self) -> Option<u64> {
+        match self {
+            Json::Init(Some(raw)) => raw.content_len(),
+            _ => None
+        }
+    }
+
+    #[inline]
+    ///Sets limit on body reading. Default is 2mb.
+    ///
+    ///When read hits the limit, it is aborted with error.
+    ///Use it when you need to control limit on your reads.
+    pub fn limit(self, limit: u64) -> Self {
+        match self {
+            Json::Init(Some(raw)) => {
+                Json::Init(Some(raw.limit(limit)))
+            }
+            _ => self
+        }
+    }
+
+    fn encode(bytes: bytes::Bytes) -> Result<J, BodyReadError> {
+        serde_json::from_slice(&bytes).map_err(BodyReadError::from)
+    }
+}
+
+impl<J: DeserializeOwned> Future for Json<J> {
+    type Item = J;
+    type Error = BodyReadError;
+
+    fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
+        loop {
+            let new_state = match self {
+                Json::Future(fut) => return fut.poll(),
+                Json::Init(raw) => Json::Future(raw.take().expect("To have body").and_then(Self::encode))
+            };
+
+            *self = new_state;
+        }
+    }
+}

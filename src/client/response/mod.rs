@@ -10,6 +10,7 @@ use ::tokio;
 use ::hyper;
 use ::futures;
 use ::futures::Future;
+use ::serde::de::DeserializeOwned;
 
 type HyperResponse = hyper::Response<hyper::Body>;
 
@@ -122,6 +123,13 @@ impl Response {
     pub fn text(self) -> extractor::Text {
         extractor::Text::new(self)
     }
+
+    #[inline]
+    ///Extracts body as JSON
+    pub fn json<J: DeserializeOwned>(self) -> extractor::Json<J> {
+        extractor::Json::new(self)
+    }
+
 }
 
 impl From<HyperResponse> for Response {
@@ -164,7 +172,7 @@ impl ResponseError {
     }
 }
 
-#[must_use = "Future must be polled to be actually get HTTP response"]
+#[must_use = "Future must be polled to actually get HTTP response"]
 ///Ongoing HTTP request.
 pub struct FutureResponse {
     inner: tokio::timer::Deadline<hyper::client::ResponseFuture>

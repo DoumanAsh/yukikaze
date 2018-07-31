@@ -46,3 +46,6 @@ flate2-c = ["flate2/miniz-sys"]
 
 # rust backend for flate2 crate
 flate2-rust = ["flate2/rust_backend"]
+
+[dev-dependencies]
+serde_derive = "1"

@@ -1,5 +1,7 @@
 extern crate yukikaze;
 extern crate tokio;
+#[macro_use]
+extern crate serde_derive;
 
 use ::std::time;
 
@@ -8,7 +10,7 @@ use yukikaze::client;
 use yukikaze::client::HttpClient;
 
 const BIN_URL: &'static str = "https://httpbin.org";
-const BIN_DEFLATE: &'static str = "https://httpbin.org/deflate";
+const BIN_DEFLATE: &'static str = "https://api.stackexchange.com/2.2/answers?site=stackoverflow&pagesize=10";
 const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
@@ -74,7 +76,6 @@ fn make_request() {
 
     let result = rt.block_on(client.execute(request));
     let result = result.expect("To get");
-
     println!("result={:?}", result);
 
     assert_eq!(result.status().as_u16(), 200);
@@ -83,6 +84,12 @@ fn make_request() {
 
     let body = result.text();
     let _result = rt.block_on(body).expect("Read body");
+}
+
+#[derive(Deserialize, Debug)]
+struct BinGzippedRsp {
+    gzipped: bool,
+    method: String,
 }
 
 #[test]
@@ -97,14 +104,15 @@ fn make_request_w_gzip_body() {
 
     let result = rt.block_on(client.execute(request));
     let result = result.expect("To get");
-
-    println!("Content-Encoding={:?}", result.content_encoding());
     println!("result={:?}", result);
-    let body = result.body();
+    assert!(result.is_success());
+
+    let body = result.json::<BinGzippedRsp>();
     let result = rt.block_on(body);
     println!("result={:?}", result);
-    //TODO: flush returns WriteZero error
-    assert!(!result.is_err());
+    let result = result.expect("Get JSON");
+    assert!(result.gzipped);
+    assert_eq!(result.method, "GET");
 }
 
 #[test]
@@ -119,11 +127,10 @@ fn make_request_w_deflate_body() {
 
     let result = rt.block_on(client.execute(request));
     let result = result.expect("To get");
-
-    //TODO: Cannot deflate? It erroers on first chunk.
-    println!("Content-Encoding={:?}", result.content_encoding());
     println!("result={:?}", result);
-    let body = result.body();
+    assert!(result.is_success());
+
+    let body = result.text();
     let result = rt.block_on(body);
     println!("result={:?}", result);
     assert!(!result.is_err());
