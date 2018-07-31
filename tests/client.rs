@@ -9,6 +9,7 @@ use yukikaze::client::HttpClient;
 
 const BIN_URL: &'static str = "https://httpbin.org";
 const BIN_DEFLATE: &'static str = "https://httpbin.org/deflate";
+const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -82,6 +83,28 @@ fn make_request() {
 
     let body = result.text();
     let _result = rt.block_on(body).expect("Read body");
+}
+
+#[test]
+fn make_request_w_gzip_body() {
+    let request = client::request::Request::get(BIN_GZIP).expect("To create google get request")
+                                                         .accept_encoding(yukikaze::header::ContentEncoding::Gzip)
+                                                         .empty();
+
+    let mut rt = get_tokio_rt();
+
+    let client = client::Client::default();
+
+    let result = rt.block_on(client.execute(request));
+    let result = result.expect("To get");
+
+    println!("Content-Encoding={:?}", result.content_encoding());
+    println!("result={:?}", result);
+    let body = result.body();
+    let result = rt.block_on(body);
+    println!("result={:?}", result);
+    //TODO: flush returns WriteZero error
+    assert!(!result.is_err());
 }
 
 #[test]

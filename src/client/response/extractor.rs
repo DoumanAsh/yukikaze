@@ -67,8 +67,10 @@ pub enum BodyReadError {
     Overflow,
     ///Unable to decode body as UTF-8
     EncodingError,
-    ///Error happened during decompression.
+    ///Error happened during deflate decompression.
     DeflateError(io::Error),
+    ///Error happened during gzip decompression.
+    GzipError(io::Error),
 }
 
 impl From<string::FromUtf8Error> for BodyReadError {
@@ -87,7 +89,8 @@ impl From<hyper::Error> for BodyReadError {
 
 enum BodyType {
     Plain(hyper::Body, bytes::BytesMut),
-    Deflate(hyper::Body, flate2::write::DeflateDecoder<bytes::buf::Writer<bytes::BytesMut>>)
+    Deflate(hyper::Body, flate2::write::DeflateDecoder<bytes::buf::Writer<bytes::BytesMut>>),
+    Gzip(hyper::Body, flate2::write::GzDecoder<bytes::buf::Writer<bytes::BytesMut>>),
 }
 
 ///Reads raw bytes from HTTP Response
@@ -114,6 +117,8 @@ impl RawBody {
         let body = match encoding {
             #[cfg(feature = "flate2")]
             header::ContentEncoding::Deflate => BodyType::Deflate(body, flate2::write::DeflateDecoder::new(bytes::BytesMut::with_capacity(buffer_size).writer())),
+            #[cfg(feature = "flate2")]
+            header::ContentEncoding::Gzip => BodyType::Gzip(body, flate2::write::GzDecoder::new(bytes::BytesMut::with_capacity(buffer_size).writer())),
             _ => BodyType::Plain(body, bytes::BytesMut::with_capacity(buffer_size)),
 
         };
@@ -168,6 +173,7 @@ impl Future for RawBody {
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
                     Err(error) => return Err(error.into())
                 },
+                #[cfg(feature = "flate2")]
                 BodyType::Deflate(ref mut body, ref mut decoder) => match body.poll() {
                     Ok(futures::Async::Ready(Some(chunk))) => {
                         decoder.write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
@@ -186,7 +192,28 @@ impl Future for RawBody {
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
                     Err(error) => return Err(error.into())
 
-                }
+                },
+                #[cfg(feature = "flate2")]
+                BodyType::Gzip(ref mut body, ref mut decoder) => match body.poll() {
+                    Ok(futures::Async::Ready(Some(chunk))) => {
+                        decoder.write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
+                        decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
+
+                        if self.limit < decoder.get_ref().get_ref().len() as u64 {
+                            return Err(BodyReadError::Overflow);
+                        }
+                        //We loop, to schedule more IO
+                    },
+                    Ok(futures::Async::Ready(None)) => {
+                        println!("done");
+                        decoder.try_finish().map_err(|error| BodyReadError::GzipError(error))?;
+                        let buffer = mem::replace(decoder.get_mut().get_mut(), bytes::BytesMut::new());
+                        return Ok(futures::Async::Ready(buffer.freeze()))
+                    },
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error.into())
+
+                },
             }
         }
     }
