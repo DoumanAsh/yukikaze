@@ -7,6 +7,7 @@ use ::std::str;
 use ::std::mem;
 
 use ::header;
+use ::utils;
 
 #[cfg(feature = "flate2")]
 use ::flate2;
@@ -89,8 +90,8 @@ impl From<hyper::Error> for BodyReadError {
 
 enum BodyType {
     Plain(hyper::Body, bytes::BytesMut),
-    Deflate(hyper::Body, flate2::write::DeflateDecoder<bytes::buf::Writer<bytes::BytesMut>>),
-    Gzip(hyper::Body, flate2::write::GzDecoder<bytes::buf::Writer<bytes::BytesMut>>),
+    Deflate(hyper::Body, flate2::write::DeflateDecoder<utils::BytesWriter>),
+    Gzip(hyper::Body, flate2::write::GzDecoder<utils::BytesWriter>),
 }
 
 ///Reads raw bytes from HTTP Response
@@ -104,8 +105,6 @@ pub struct RawBody {
 impl RawBody {
     ///Creates new instance.
     pub fn new(response: super::Response) -> Self {
-        use ::bytes::buf::BufMut;
-
         let encoding = response.content_encoding();
         let buffer_size = match response.content_len() {
             Some(len) => len as usize,
@@ -116,9 +115,9 @@ impl RawBody {
 
         let body = match encoding {
             #[cfg(feature = "flate2")]
-            header::ContentEncoding::Deflate => BodyType::Deflate(body, flate2::write::DeflateDecoder::new(bytes::BytesMut::with_capacity(buffer_size).writer())),
+            header::ContentEncoding::Deflate => BodyType::Deflate(body, flate2::write::DeflateDecoder::new(utils::BytesWriter::with_capacity(buffer_size))),
             #[cfg(feature = "flate2")]
-            header::ContentEncoding::Gzip => BodyType::Gzip(body, flate2::write::GzDecoder::new(bytes::BytesMut::with_capacity(buffer_size).writer())),
+            header::ContentEncoding::Gzip => BodyType::Gzip(body, flate2::write::GzDecoder::new(utils::BytesWriter::with_capacity(buffer_size))),
             _ => BodyType::Plain(body, bytes::BytesMut::with_capacity(buffer_size)),
 
         };
@@ -186,8 +185,8 @@ impl Future for RawBody {
                     },
                     Ok(futures::Async::Ready(None)) => {
                         decoder.try_finish().map_err(|error| BodyReadError::DeflateError(error))?;
-                        let buffer = mem::replace(decoder.get_mut().get_mut(), bytes::BytesMut::new());
-                        return Ok(futures::Async::Ready(buffer.freeze()))
+                        let buffer = decoder.get_mut().freeze();
+                        return Ok(futures::Async::Ready(buffer))
                     },
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
                     Err(error) => return Err(error.into())
@@ -199,16 +198,15 @@ impl Future for RawBody {
                         decoder.write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
                         decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
 
-                        if self.limit < decoder.get_ref().get_ref().len() as u64 {
+                        if self.limit < decoder.get_ref().len() as u64 {
                             return Err(BodyReadError::Overflow);
                         }
                         //We loop, to schedule more IO
                     },
                     Ok(futures::Async::Ready(None)) => {
-                        println!("done");
                         decoder.try_finish().map_err(|error| BodyReadError::GzipError(error))?;
-                        let buffer = mem::replace(decoder.get_mut().get_mut(), bytes::BytesMut::new());
-                        return Ok(futures::Async::Ready(buffer.freeze()))
+                        let buffer = decoder.get_mut().freeze();
+                        return Ok(futures::Async::Ready(buffer))
                     },
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
                     Err(error) => return Err(error.into())

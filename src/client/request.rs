@@ -19,6 +19,8 @@ use ::header;
 use ::http::HttpTryFrom;
 use ::http::header::HeaderValue;
 
+use ::utils;
+
 type HyperRequest = hyper::Request<hyper::Body>;
 
 #[derive(Debug)]
@@ -216,7 +218,7 @@ impl Builder {
         let mut uri_parts = self.parts.uri.into_parts();
         let path = uri_parts.path_and_query;
 
-        let mut buffer = bytes::BytesMut::new().writer();
+        let mut buffer = utils::BytesWriter::new();
         let query = serde_urlencoded::to_string(&query).expect("To url-encode");
 
         let _ = match path {
@@ -239,7 +241,7 @@ impl Builder {
 
         // set cookies
         if let Some(jar) = self.cookies.take() {
-            let mut buffer = bytes::BytesMut::new().writer();;
+            let mut buffer = utils::BytesWriter::new();
 
             for cook in jar.delta() {
                 let name = utf8_percent_encode(cook.name(), USERINFO_ENCODE_SET);
@@ -268,7 +270,7 @@ impl Builder {
 
     ///Creates request with JSON payload.
     pub fn json<J: Serialize>(self, body: J) -> serde_json::Result<Request> {
-        let mut buffer = bytes::BytesMut::new().writer();
+        let mut buffer = utils::BytesWriter::new();
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();
         Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").body(body))
