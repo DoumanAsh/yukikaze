@@ -207,12 +207,12 @@ fn make_request_w_gzip_body_stored_as_file() {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 struct HttpBinJson {
   slideshow: Slideshow,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 struct Slides {
   title: String,
   #[serde(rename = "type")]
@@ -220,7 +220,7 @@ struct Slides {
   items: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 struct Slideshow {
   author: String,
   date: String,
@@ -240,6 +240,21 @@ fn get_json_response() {
     let result = rt.block_on(json);
     let res = result.expect("Error with json!");
 
-    println!("{:#?}", res);
-    assert_eq!(res.slideshow.title, String::from("Sample Slide Show"));
+    let real_json = HttpBinJson {
+        slideshow: Slideshow {
+            author: String::from("Yours Truly"),
+            date: String::from("date of publication"),
+            slides: vec![Slides {title: String::from("Wake up to WonderWidgets!"),
+                                 _type: String::from("all"),
+                                 items: None},
+                         Slides {title: String::from("Overview"),
+                                 _type: String::from("all"),
+                                 items:
+                                   Some(vec![String::from("Why <em>WonderWidgets</em> are great"),
+                                             String::from("Who <em>buys</em> WonderWidgets")])}],
+            title: String::from("Sample Slide Show"),
+        },
+    };
+
+    assert_eq!(res, real_json);
 }
