@@ -2,6 +2,7 @@
 
 use ::std::time;
 
+use ::header;
 use ::hyper;
 
 ///Generic config trait.
@@ -9,6 +10,7 @@ use ::hyper;
 ///Each method describes single aspect of configuration
 ///and provided with sane defaults
 pub trait Config {
+    #[inline]
     ///Specifies number of threads to use for DNS
     ///resolve.
     ///
@@ -17,6 +19,7 @@ pub trait Config {
         4
     }
 
+    #[inline]
     ///Specifies whether to automatically request compressed response.
     ///
     ///Defaults to true.
@@ -24,6 +27,7 @@ pub trait Config {
         true
     }
 
+    #[inline]
     ///Specifies request timeout.
     ///
     ///Default is 30 seconds
@@ -31,6 +35,16 @@ pub trait Config {
         time::Duration::from_secs(30)
     }
 
+    #[inline]
+    ///Allows to sets default headers before request
+    ///is sent out
+    ///
+    ///It is called as soon as request is being sent out,
+    ///but before `Accept-Encoding` is set.
+    fn default_headers(_headers: &mut header::HeaderMap) {
+    }
+
+    #[inline]
     ///Allows to hook hyper's Client configuration.
     ///
     ///By default it uses hyper's defaults

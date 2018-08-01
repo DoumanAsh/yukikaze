@@ -55,6 +55,8 @@ impl<C: config::Config> HttpClient for Client<C> {
 
         let mut request = request.inner;
 
+        C::default_headers(request.headers_mut());
+
         #[cfg(feature = "flate2")]
         {
             if C::decompress() {
