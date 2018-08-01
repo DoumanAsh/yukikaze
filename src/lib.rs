@@ -7,6 +7,7 @@
 //!- `flate2-c` - Enables decompression using `flate2` crate with C backend
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend
 #![warn(missing_docs)]
+#![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 
 pub extern crate serde;
 pub extern crate serde_json;
