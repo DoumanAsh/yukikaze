@@ -41,7 +41,12 @@ pub trait Config {
     ///
     ///It is called as soon as request is being sent out,
     ///but before `Accept-Encoding` is set.
-    fn default_headers(_headers: &mut header::HeaderMap) {
+    ///
+    ///By default it sets Yukikaze-sama user's agent.
+    fn default_headers(headers: &mut header::HeaderMap) {
+        if !headers.contains_key(header::USER_AGENT) {
+            headers.insert(header::USER_AGENT, header::HeaderValue::from_static(concat!("Yukikaze/", env!("CARGO_PKG_VERSION"))));
+        }
     }
 
     #[inline]

@@ -139,7 +139,17 @@ impl Response {
 
     #[inline]
     ///Extracts body to file.
+    ///
+    ///# Panics
+    ///
+    ///- If file is read-only. Checked only when debug assertions are on.
     pub fn file(self, file: fs::File) -> extractor::FileBody {
+        #[cfg(debug_assertions)]
+        {
+            let meta = file.metadata().expect("To be able to get metadata");
+            debug_assert!(!meta.permissions().readonly(), "File is read-only");
+        }
+
         extractor::FileBody::new(self, file)
     }
 }
