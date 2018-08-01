@@ -20,11 +20,39 @@ use ::futures::{Future, Stream};
 use ::bytes;
 use ::serde_json;
 use ::serde::de::DeserializeOwned;
+use ::cookie;
 
 //The size of buffer to use by default.
 const BUFFER_SIZE: usize = 4096;
 //The default limit on body size 2mb.
 const DEFEAULT_LIMIT: u64 = 2 * 1024 * 1024;
+
+///Cookie extractor.
+///
+///As it returns references they would tie
+///up original response, if you want avoid it
+///you can use `Cookie::into_owned()`
+pub struct CookieIter<'a> {
+    pub(crate) iter: header::ValueIter<'a, header::HeaderValue>,
+}
+
+impl<'a> Iterator for CookieIter<'a> {
+    type Item = Result<cookie::Cookie<'a>, cookie::ParseError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        use ::percent_encoding::percent_decode;
+
+        if let Some(cook) = self.iter.by_ref().next() {
+            let cook = percent_decode(cook.as_bytes());
+            let cook = cook.decode_utf8().map_err(|error| cookie::ParseError::Utf8Error(error))
+                                         .and_then(|cook| cookie::Cookie::parse(cook));
+            Some(cook)
+        } else {
+            None
+        }
+    }
+}
 
 ///Extracts ETags from response.
 ///

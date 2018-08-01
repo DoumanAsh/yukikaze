@@ -94,16 +94,22 @@ impl Response {
     }
 
     #[inline]
-    ///Retrieves cookies from `Set-Cookie` header.
-    pub fn cookies(&self) -> Result<Vec<cookie::Cookie<'static>>, cookie::ParseError> {
-        use ::percent_encoding::percent_decode;
-
-        let mut cookies = Vec::new();
-        for cook in self.headers().get_all(header::SET_COOKIE).iter() {
-            let cook = percent_decode(cook.as_bytes());
-            let cook = cook.decode_utf8().map_err(|error| cookie::ParseError::Utf8Error(error))?;
-            cookies.push(cookie::Cookie::parse(cook)?.into_owned());
+    ///Creates iterator of cookie from `Set-Cookie` header.
+    pub fn cookies_iter(&self) -> extractor::CookieIter {
+        extractor::CookieIter {
+            iter: self.headers().get_all(header::SET_COOKIE).iter()
         }
+    }
+
+    #[inline]
+    ///Retrieves owned cookies from `Set-Cookie` header.
+    pub fn cookies(&self) -> Result<Vec<cookie::Cookie<'static>>, cookie::ParseError> {
+        let mut cookies = Vec::new();
+
+        for cook in self.cookies_iter() {
+            cookies.push(cook?.into_owned());
+        }
+
         Ok(cookies)
     }
 
