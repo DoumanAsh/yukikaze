@@ -18,6 +18,7 @@ const BIN_GET: &'static str = "https://httpbin.org/get";
 const BIN_DEFLATE: &'static str = "https://api.stackexchange.com/2.2/answers?site=stackoverflow&pagesize=10";
 const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 const BIN_JSON: &'static str = "http://httpbin.org/json";
+const BIN_BASIC_AUTH: &'static str = "http://httpbin.org/basic-auth";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -257,4 +258,30 @@ fn get_json_response() {
     };
 
     assert_eq!(res, real_json);
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BasicAuthRsp {
+    authenticated: bool,
+    user: String
+}
+
+#[test]
+fn pass_basic_auth() {
+    const LOGIN: &'static str = "loli";
+    const PASSWORD: &'static str = "password";
+
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+
+    let url = format!("{}/{}/{}", BIN_BASIC_AUTH, LOGIN, PASSWORD);
+    let request = client::request::Request::get(url).expect("Error with request!").basic_auth(LOGIN, Some(PASSWORD)).empty();
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+
+    let json = response.json::<BasicAuthRsp>();
+    let result = rt.block_on(json);
+    let res = result.expect("Error with json!");
+
+    assert_eq!(res.user, LOGIN);
+    assert!(res.authenticated);
 }
