@@ -285,3 +285,25 @@ fn pass_basic_auth() {
     assert_eq!(res.user, LOGIN);
     assert!(res.authenticated);
 }
+
+#[cfg(feature = "encoding")]
+#[test]
+fn decode_non_utf8() {
+    use yukikaze::header;
+
+    const URL: &'static str = "http://seiya-saiga.com/";
+
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+
+    let request = client::request::Request::get(URL).expect("Error with request!").empty();
+    let mut response = rt.block_on(client.execute(request)).expect("Error with response!");
+
+    //Pretend that it acctually sets Content-Type correctly
+    response.headers_mut().insert(header::CONTENT_TYPE, header::HeaderValue::from_static("text/html; charset=shift_jis"));
+    println!("response={:?}", response);
+    let text = response.text();
+    let result = rt.block_on(text);
+    let res = result.expect("Error with decoding text!");
+    assert!(res.len() > 0);
+}

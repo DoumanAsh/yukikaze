@@ -320,11 +320,20 @@ impl Future for RawBody {
 }
 
 ///Reads String from HTTP Response.
+///
+///# Encoding feature
+///
+///If `Content-Encoding` contains charset information it
+///shall be automatically applied when decoding data.
 pub enum Text {
     #[doc(hidden)]
     Init(Option<RawBody>),
+    #[cfg(feature = "encoding")]
     #[doc(hidden)]
-    Future(futures::AndThen<RawBody, Result<String, BodyReadError>, fn(bytes::Bytes) -> Result<String, BodyReadError>>)
+    Future(RawBody, Option<encoding::EncodingRef>),
+    #[cfg(not(feature = "encoding"))]
+    #[doc(hidden)]
+    Future(RawBody),
 }
 
 impl Text {
@@ -355,10 +364,6 @@ impl Text {
             _ => self
         }
     }
-
-    fn encode(bytes: bytes::Bytes) -> Result<String, BodyReadError> {
-        String::from_utf8(bytes.to_vec()).map_err(|error| error.into())
-    }
 }
 
 impl Future for Text {
@@ -368,8 +373,37 @@ impl Future for Text {
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
         loop {
             let new_state = match self {
-                Text::Future(fut) => return fut.poll(),
-                Text::Init(raw) => Text::Future(raw.take().expect("To have body").and_then(Self::encode))
+                //Encoding
+                #[cfg(feature = "encoding")]
+                Text::Future(fut, enc) => match fut.poll() {
+                    Ok(futures::Async::Ready(bytes)) => return match enc {
+                        Some(enc) => enc.decode(&bytes, encoding::types::DecoderTrap::Strict)
+                                        .map_err(|_| BodyReadError::EncodingError)
+                                        .map(|st| futures::Async::Ready(st)),
+                        None => String::from_utf8(bytes.to_vec()).map_err(|error| error.into()).map(|st| futures::Async::Ready(st))
+                    },
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error)
+                },
+                #[cfg(feature = "encoding")]
+                Text::Init(raw) => {
+                    let raw = raw.take().expect("To have body");
+                    let encoding = raw.encoding().ok().and_then(|enc| match enc.name() {
+                        "utf-8" => None,
+                        _ => Some(enc)
+                    });
+                    Text::Future(raw, encoding)
+                },
+                //No Encoding
+                #[cfg(not(feature = "encoding"))]
+                Text::Init(raw) => Text::Future(raw.take().expect("To have body")),
+                #[cfg(not(feature = "encoding"))]
+                Text::Future(fut) => match fut.poll() {
+                    Ok(futures::Async::Ready(bytes)) => return String::from_utf8(bytes.to_vec()).map_err(|error| error.into())
+                                                                                                .map(|st| futures::Async::Ready(st)),
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error)
+                }
             };
 
             *self = new_state;

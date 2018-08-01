@@ -6,5 +6,6 @@ test:cargo:
     stage: test
     script:
         - rustc --version && cargo --version
-        - cargo test
+        - cargo check
+        - cargo test --features encoding
 
