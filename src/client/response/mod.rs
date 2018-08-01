@@ -1,5 +1,6 @@
 //!Response primitives.
 
+use ::std::fs;
 use ::std::time;
 use ::std::ops::{Deref, DerefMut};
 
@@ -130,6 +131,11 @@ impl Response {
         extractor::Json::new(self)
     }
 
+    #[inline]
+    ///Extracts body to file.
+    pub fn file(self, file: fs::File) -> extractor::FileBody {
+        extractor::FileBody::new(self, file)
+    }
 }
 
 impl From<HyperResponse> for Response {

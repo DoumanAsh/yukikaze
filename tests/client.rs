@@ -2,7 +2,11 @@ extern crate yukikaze;
 extern crate tokio;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 
+use ::std::fs;
+use ::std::io;
+use ::std::io::Seek;
 use ::std::time;
 
 use yukikaze::http;
@@ -10,6 +14,7 @@ use yukikaze::client;
 use yukikaze::client::HttpClient;
 
 const BIN_URL: &'static str = "https://httpbin.org";
+const BIN_GET: &'static str = "https://httpbin.org/get";
 const BIN_DEFLATE: &'static str = "https://api.stackexchange.com/2.2/answers?site=stackoverflow&pagesize=10";
 const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 
@@ -134,4 +139,68 @@ fn make_request_w_deflate_body() {
     let result = rt.block_on(body);
     println!("result={:?}", result);
     assert!(!result.is_err());
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Query {
+    name: String,
+    password: String
+}
+
+#[derive(Deserialize, Debug)]
+struct GetResponse {
+    args: Query,
+    url: String
+}
+
+#[test]
+fn make_get_query() {
+    let query = Query {
+        name: "Test".to_owned(),
+        password: "TestPassword".to_owned()
+    };
+    let request = client::request::Request::get(BIN_GET).expect("To create google get request").query(&query).empty();
+
+    let mut rt = get_tokio_rt();
+
+    let client = client::Client::default();
+
+    let result = rt.block_on(client.execute(request));
+    println!("result={:?}", result);
+    let result = result.expect("Success");
+
+    let body = result.json::<GetResponse>();
+    let result = rt.block_on(body);
+    println!("result={:?}", result);
+    let result = result.expect("Get JSON");
+    assert_eq!(result.args.name, query.name);
+    assert_eq!(result.args.password, query.password);
+    assert_eq!(result.url, format!("{}?name={}&password={}", BIN_GET, query.name, query.password));
+
+}
+
+#[test]
+fn make_request_w_gzip_body_stored_as_file() {
+    let request = client::request::Request::get(BIN_GZIP).expect("To create google get request")
+                                                         .accept_encoding(yukikaze::header::ContentEncoding::Gzip)
+                                                         .empty();
+
+    let mut rt = get_tokio_rt();
+
+    let client = client::Client::default();
+
+    let result = rt.block_on(client.execute(request));
+    let result = result.expect("To get");
+    assert!(result.is_success());
+
+    let file = fs::OpenOptions::new().truncate(true).read(true).write(true).create(true).open("gzip.json").expect("To create file");
+    let body = result.file(file);
+    let result = rt.block_on(body);
+    let mut file = result.expect("Get File");
+    file.seek(io::SeekFrom::Start(0)).expect("Move to the beggining of file");
+    let result: BinGzippedRsp = serde_json::from_reader(file).expect("To get gzip.json");
+    assert!(result.gzipped);
+    assert_eq!(result.method, "GET");
+
+    let _ = fs::remove_file("gzip.json");
 }

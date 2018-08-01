@@ -1,5 +1,6 @@
 ///!Response extractors
 
+use ::std::fs;
 use ::std::io;
 use ::std::io::Write;
 use ::std::string;
@@ -76,6 +77,8 @@ pub enum BodyReadError {
     DeflateError(io::Error),
     ///Error happened during gzip decompression.
     GzipError(io::Error),
+    ///Error happenend when writing to file.
+    FileError(fs::File, io::Error),
 }
 
 impl From<serde_json::error::Error> for BodyReadError {
@@ -118,7 +121,6 @@ enum BodyType {
 pub struct RawBody {
     parts: http::response::Parts,
     body: BodyType,
-    //The remaining bytes to read.
     limit: u64,
 }
 
@@ -368,6 +370,124 @@ impl<J: DeserializeOwned> Future for Json<J> {
             };
 
             *self = new_state;
+        }
+    }
+}
+
+enum FileBodyType {
+    Plain(hyper::Body, Option<io::BufWriter<fs::File>>),
+    Deflate(hyper::Body, Option<flate2::write::DeflateDecoder<io::BufWriter<fs::File>>>),
+    Gzip(hyper::Body, Option<flate2::write::GzDecoder<io::BufWriter<fs::File>>>),
+}
+
+///Redirects body to file.
+pub struct FileBody {
+    parts: http::response::Parts,
+    body: FileBodyType,
+}
+
+impl FileBody {
+    ///Creates new instance.
+    pub fn new(response: super::Response, file: fs::File) -> Self {
+        let encoding = response.content_encoding();
+        let (parts, body) = response.inner.into_parts();
+        let file = io::BufWriter::new(file);
+
+        let body = match encoding {
+            #[cfg(feature = "flate2")]
+            header::ContentEncoding::Deflate => FileBodyType::Deflate(body, Some(flate2::write::DeflateDecoder::new(file))),
+            #[cfg(feature = "flate2")]
+            header::ContentEncoding::Gzip => FileBodyType::Gzip(body, Some(flate2::write::GzDecoder::new(file))),
+            _ => FileBodyType::Plain(body, Some(file)),
+        };
+
+        Self {
+            parts,
+            body,
+        }
+    }
+
+    #[inline]
+    ///Retrieves length of content to receive, if `Content-Length` exists.
+    pub fn content_len(&self) -> Option<u64> {
+        self.parts.headers
+            .get(header::CONTENT_LENGTH)
+            .and_then(|header| header.to_str().ok())
+            .and_then(|header| header.parse().ok())
+    }
+}
+
+impl Future for FileBody {
+    type Item = fs::File;
+    type Error = BodyReadError;
+
+    fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
+        loop {
+            match self.body {
+                FileBodyType::Plain(ref mut body, ref mut buffer) => match body.poll() {
+                    Ok(futures::Async::Ready(Some(chunk))) => {
+                        buffer.as_mut().unwrap().write_all(&chunk).map_err(|error| {
+                            let file = buffer.take().unwrap();
+                            //TODO: consider how to get File without stumbling into error
+                            BodyReadError::FileError(file.into_inner().expect("To get File"), error)
+                        })?;
+                        //We loop, to schedule more IO
+                    },
+                    Ok(futures::Async::Ready(None)) => {
+                        let file = buffer.take().unwrap();
+                        let mut file = file.into_inner()
+                                           .map_err(|error| BodyReadError::FileError(buffer.take().unwrap().into_inner().expect("To get file"), error.into()))?;
+                        file.flush().map_err(|error| BodyReadError::FileError(buffer.take().unwrap().into_inner().expect("To get file"), error))?;
+
+                        return Ok(futures::Async::Ready(file))
+                    },
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error.into())
+                },
+                #[cfg(feature = "flate2")]
+                FileBodyType::Deflate(ref mut body, ref mut decoder) => match body.poll() {
+                    Ok(futures::Async::Ready(Some(chunk))) => {
+                        decoder.as_mut().unwrap().write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
+                        //We loop, to schedule more IO
+                    },
+                    Ok(futures::Async::Ready(None)) => {
+                        let mut decoder = decoder.take().unwrap();
+                        decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
+                        let file = decoder.finish().map_err(|error| BodyReadError::DeflateError(error))?;
+
+                        let mut file = file.into_inner().expect("Retrieve File from BufWriter");
+                        return match file.flush() {
+                            Ok(_) => Ok(futures::Async::Ready(file)),
+                            Err(error) => Err(BodyReadError::FileError(file, error))
+                        }
+                    },
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error.into())
+
+                },
+                #[cfg(feature = "flate2")]
+                FileBodyType::Gzip(ref mut body, ref mut decoder) => match body.poll() {
+                    Ok(futures::Async::Ready(Some(chunk))) => {
+                        decoder.as_mut().unwrap().write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
+                        //We loop, to schedule more IO
+                    },
+                    Ok(futures::Async::Ready(None)) => {
+                        let mut decoder = decoder.take().unwrap();
+                        decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
+                        let file = decoder.finish().map_err(|error| BodyReadError::GzipError(error))?;
+
+                        let mut file = file.into_inner().expect("Retrieve File from BufWriter");
+
+                        return match file.flush() {
+                            Ok(_) => Ok(futures::Async::Ready(file)),
+                            Err(error) => Err(BodyReadError::FileError(file, error))
+                        }
+                    },
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error.into())
+
+                },
+            }
         }
     }
 }

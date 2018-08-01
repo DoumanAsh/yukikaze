@@ -214,7 +214,7 @@ impl Builder {
     ///
     ///- If unable to encode data.
     ///- If URI creation fails
-    pub fn query<Q: Serialize>(mut self, query: Q) -> Self {
+    pub fn query<Q: Serialize>(mut self, query: &Q) -> Self {
         let mut uri_parts = self.parts.uri.into_parts();
         let path = uri_parts.path_and_query;
 
@@ -263,13 +263,13 @@ impl Builder {
     }
 
     ///Creates request with Form payload.
-    pub fn form<F: Serialize>(self, body: F) -> Result<Request, serde_urlencoded::ser::Error> {
+    pub fn form<F: Serialize>(self, body: &F) -> Result<Request, serde_urlencoded::ser::Error> {
         let body = serde_urlencoded::to_string(&body)?;
         Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(body))
     }
 
     ///Creates request with JSON payload.
-    pub fn json<J: Serialize>(self, body: J) -> serde_json::Result<Request> {
+    pub fn json<J: Serialize>(self, body: &J) -> serde_json::Result<Request> {
         let mut buffer = utils::BytesWriter::new();
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();

@@ -2,6 +2,6 @@
 
 [![Build](https://gitlab.com/Douman/yukikaze/badges/master/build.svg)](https://gitlab.com/Douman/yukikaze/pipelines)
 
-![Yukikaze image](Yukikaze.png)
+![Yukikaze image](https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png)
 
 Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](https://crates.io/crates/hyper)
