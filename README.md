@@ -6,4 +6,6 @@
 
 ![Yukikaze image](https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png)
 
+[Documentation](https://doumanash.github.io/yukikaze-docs/to_deploy/index.html)
+
 Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](https://crates.io/crates/hyper)
