@@ -17,6 +17,7 @@ const BIN_URL: &'static str = "https://httpbin.org";
 const BIN_GET: &'static str = "https://httpbin.org/get";
 const BIN_DEFLATE: &'static str = "https://api.stackexchange.com/2.2/answers?site=stackoverflow&pagesize=10";
 const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
+const BIN_JSON: &'static str = "http://httpbin.org/json";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -203,4 +204,57 @@ fn make_request_w_gzip_body_stored_as_file() {
     assert_eq!(result.method, "GET");
 
     let _ = fs::remove_file("gzip.json");
+}
+
+
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
+struct HttpBinJson {
+  slideshow: Slideshow,
+}
+
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
+struct Slides {
+  title: String,
+  #[serde(rename = "type")]
+  _type: String,
+  items: Option<Vec<String>>,
+}
+
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
+struct Slideshow {
+  author: String,
+  date: String,
+  slides: Vec<Slides>,
+  title: String,
+}
+
+#[test]
+fn get_json_response() {
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+
+    let request = client::request::Request::get(BIN_JSON).expect("Error with request!").empty();
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+
+    let json = response.json::<HttpBinJson>();
+    let result = rt.block_on(json);
+    let res = result.expect("Error with json!");
+
+    let real_json = HttpBinJson {
+        slideshow: Slideshow {
+            author: String::from("Yours Truly"),
+            date: String::from("date of publication"),
+            slides: vec![Slides {title: String::from("Wake up to WonderWidgets!"),
+                                 _type: String::from("all"),
+                                 items: None},
+                         Slides {title: String::from("Overview"),
+                                 _type: String::from("all"),
+                                 items:
+                                   Some(vec![String::from("Why <em>WonderWidgets</em> are great"),
+                                             String::from("Who <em>buys</em> WonderWidgets")])}],
+            title: String::from("Sample Slide Show"),
+        },
+    };
+
+    assert_eq!(res, real_json);
 }
