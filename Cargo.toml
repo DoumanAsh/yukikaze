@@ -3,6 +3,7 @@ name = "yukikaze"
 version = "0.0.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and cute HTTP client library."
+readme = "README.md"
 repository = "https://gitlab.com/Douman/yukikaze"
 license = "Apache-2.0"
 keywords = ["http", "http-client"]
