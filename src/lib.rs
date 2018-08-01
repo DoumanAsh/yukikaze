@@ -6,6 +6,7 @@
 //!
 //!- `flate2-c` - Enables decompression using `flate2` crate with C backend
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend
+//!- `encoding` - Enables encoding crate support.
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 
@@ -15,6 +16,7 @@ pub extern crate serde_urlencoded;
 pub extern crate cookie;
 pub extern crate percent_encoding;
 pub extern crate http;
+pub extern crate mime;
 pub extern crate etag;
 pub extern crate tokio;
 pub extern crate hyper;
@@ -23,6 +25,8 @@ pub extern crate data_encoding;
 pub extern crate bytes;
 #[cfg(feature = "flate2")]
 pub extern crate flate2;
+#[cfg(feature = "encoding")]
+pub extern crate encoding;
 extern crate hyper_rustls;
 
 #[macro_use]

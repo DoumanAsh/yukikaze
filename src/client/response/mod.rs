@@ -6,6 +6,9 @@ use ::std::ops::{Deref, DerefMut};
 
 use ::header;
 
+#[cfg(feature = "encoding")]
+use ::encoding;
+use ::mime;
 use ::cookie;
 use ::tokio;
 use ::hyper;
@@ -15,6 +18,8 @@ use ::serde::de::DeserializeOwned;
 
 type HyperResponse = hyper::Response<hyper::Body>;
 
+///Response errors.
+pub mod errors;
 ///Extractor module.
 pub mod extractor;
 
@@ -71,6 +76,36 @@ impl Response {
     ///The response status code is in range 500 to 599
     pub fn is_internal_error(&self) -> bool {
         self.inner.status().is_client_error()
+    }
+
+    #[inline]
+    ///Retrieves `Content-Type` as Mime, if any.
+    pub fn mime(&self) -> Result<Option<mime::Mime>, errors::ContentTypeError> {
+        let content_type = self.headers().get(header::CONTENT_TYPE)
+                                         .and_then(|content_type| content_type.to_str().ok());
+
+        if let Some(content_type) = content_type {
+            content_type.parse::<mime::Mime>().map(|mime| Some(mime)).map_err(errors::ContentTypeError::from)
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[cfg(feature = "encoding")]
+    ///Retrieves content's encoding, if any.
+    ///
+    ///If it is omitted, UTF-8 is assumed.
+    pub fn encoding(&self) -> Result<encoding::EncodingRef, errors::ContentTypeError> {
+        let mime = self.mime()?;
+        let mime = mime.as_ref().and_then(|mime| mime.get_param("charset"));
+
+        match mime {
+            Some(charset) => match encoding::label::encoding_from_whatwg_label(charset.as_str()) {
+                Some(enc) => Ok(enc),
+                None => Err(errors::ContentTypeError::UnknownEncoding)
+            },
+            None => Ok(encoding::all::UTF_8),
+        }
     }
 
     #[inline]

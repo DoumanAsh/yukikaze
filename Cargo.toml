@@ -27,7 +27,9 @@ http = "0.1"
 cookie = "0.11"
 percent-encoding = "1"
 etag = "1"
+mime = "0.3"
 
+encoding = { version = "0.2", optional = true }
 data-encoding = "2"
 
 serde = "1"
@@ -37,7 +39,7 @@ serde_urlencoded = "0.5"
 flate2 = { version = "^1.0.2", optional = true, default-features = false }
 
 [package.metadata.docs.rs]
-features = ["flate2-c"]
+features = ["flate2-c", "encoding"]
 
 [features]
 default = ["flate2-c"]
