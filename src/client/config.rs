@@ -17,7 +17,7 @@ pub trait Config {
         4
     }
 
-    ///Specifies whether to automatically handle decompression
+    ///Specifies whether to automatically request compressed response.
     ///
     ///Defaults to true.
     fn decompress() -> bool {
