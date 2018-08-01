@@ -4,9 +4,9 @@
 //!
 //!## Available features
 //!
-//!- `flate2-c` - Enables decompression using `flate2` crate with C backend
-//!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend
-//!- `encoding` - Enables encoding crate support.
+//!- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
+//!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default on.
+//!- `encoding` - Enables encoding crate support. Default off.
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 
