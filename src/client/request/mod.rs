@@ -5,6 +5,7 @@ use ::std::io::Write;
 use ::std::fmt;
 use ::std::ops::{Deref, DerefMut};
 
+use ::etag;
 use ::cookie;
 use ::data_encoding::BASE64;
 use ::http;
@@ -28,6 +29,8 @@ type HyperRequest = hyper::Request<hyper::Body>;
 pub struct Request {
     pub(crate) inner: HyperRequest
 }
+
+pub mod tags;
 
 impl Request {
     ///Creates new request.
@@ -153,6 +156,22 @@ impl Builder {
             _ => (),
         }
 
+        self
+    }
+
+    ///Sets ETag value into corresponding header.
+    ///
+    ///If it is set, then value is appended to existing header as per standard after
+    ///semicolon.
+    pub fn set_etag<E: tags::EtagMode>(mut self, etag: &etag::EntityTag, _: E) -> Self {
+        let mut buffer = utils::BytesWriter::new();
+        let _ = match self.headers().remove(E::HEADER_NAME) {
+            Some(old) => write!(&mut buffer, "{}, {}", old.to_str().expect("Invalid ETag!"), etag),
+            None => write!(&mut buffer, "{}", etag),
+        };
+
+        let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+        self.headers().insert(E::HEADER_NAME, value);
         self
     }
 

@@ -4,7 +4,6 @@ use ::std::fs;
 use ::std::io;
 use ::std::io::Write;
 use ::std::string;
-use ::std::str;
 use ::std::mem;
 
 use ::header;
@@ -16,7 +15,6 @@ use ::encoding;
 use ::mime;
 #[cfg(feature = "flate2")]
 use ::flate2;
-use ::etag;
 use ::hyper;
 use ::http;
 use ::futures;
@@ -55,42 +53,6 @@ impl<'a> Iterator for CookieIter<'a> {
         } else {
             None
         }
-    }
-}
-
-///Extracts ETags from response.
-///
-///It skips invalid tags without reporint errors.
-pub struct Etag<'a> {
-    inner: str::Split<'a, char>
-}
-
-impl<'a> Etag<'a> {
-    ///Creates extractor.
-    ///
-    ///Panics if header value is not UTF-8 string.
-    pub fn new(etag: &'a header::HeaderValue) -> Self {
-        let etag = etag.as_bytes();
-        let etag = str::from_utf8(etag).expect("UTF-8 header value");
-
-        Self {
-            inner: etag.split(',')
-        }
-    }
-}
-
-impl<'a> Iterator for Etag<'a> {
-    type Item = etag::EntityTag;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(value) = self.inner.next() {
-            match value.trim().parse::<etag::EntityTag>() {
-                Ok(etag) => return Some(etag),
-                Err(_) => ()
-            }
-        }
-
-        None
     }
 }
 

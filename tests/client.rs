@@ -3,6 +3,8 @@ extern crate tokio;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate etag;
+extern crate percent_encoding;
 
 use ::std::fs;
 use ::std::io;
@@ -19,6 +21,7 @@ const BIN_DEFLATE: &'static str = "https://api.stackexchange.com/2.2/answers?sit
 const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 const BIN_JSON: &'static str = "http://httpbin.org/json";
 const BIN_BASIC_AUTH: &'static str = "http://httpbin.org/basic-auth";
+const BIN_ETAG: &'static str = "http://httpbin.org/etag";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -284,6 +287,33 @@ fn pass_basic_auth() {
 
     assert_eq!(res.user, LOGIN);
     assert!(res.authenticated);
+}
+
+#[test]
+fn test_etag() {
+    use percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET};
+
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+    const ETAG: &'static str = "12345";
+
+    let url = format!("{}/{}", BIN_ETAG, utf8_percent_encode(&format!("\"{}\"", ETAG), USERINFO_ENCODE_SET));
+    let request = client::request::Request::get(&url).expect("Error with request!").empty();
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+
+    assert!(response.is_success());
+    let rsp_etag = response.etag().expect("To have etag");
+    assert_eq!(rsp_etag.tag(), ETAG);
+
+    let if_none_match = etag::EntityTag::strong(ETAG.to_string());
+    let request = client::request::Request::get(&url).expect("Error with request!")
+                                                     .set_etag(&if_none_match, yukikaze::client::request::tags::IfNoneMatch)
+                                                     .empty();
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+    let rsp_etag = response.etag().expect("To have etag");
+    assert_eq!(rsp_etag, if_none_match);
+
+    //TODO: it seems httpbin doesn't return 304 for some reason here
 }
 
 #[cfg(feature = "encoding")]

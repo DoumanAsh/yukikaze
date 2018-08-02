@@ -6,6 +6,7 @@ use ::std::ops::{Deref, DerefMut};
 
 use ::header;
 
+use ::etag;
 #[cfg(feature = "encoding")]
 use ::encoding;
 use ::mime;
@@ -150,8 +151,10 @@ impl Response {
 
     #[inline]
     ///Extracts Etags, if any.
-    pub fn etag<'a>(&'a self) -> Option<extractor::Etag<'a>> {
-        self.inner.headers().get(header::ETAG).map(|header| extractor::Etag::new(header))
+    pub fn etag(&self) -> Option<etag::EntityTag> {
+        self.inner.headers().get(header::ETAG)
+                            .and_then(|header| header.to_str().ok())
+                            .and_then(|header| header.trim().parse().ok())
     }
 
     #[inline]
