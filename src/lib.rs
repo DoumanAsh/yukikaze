@@ -7,6 +7,7 @@
 //!- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default on.
 //!- `encoding` - Enables encoding crate support. Default off.
+//!- `rt` - Enables runtime module. Default off.
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 
@@ -33,3 +34,5 @@ extern crate hyper_rustls;
 mod utils;
 pub mod header;
 pub mod client;
+#[cfg(feature = "rt")]
+pub mod rt;

@@ -39,10 +39,13 @@ serde_urlencoded = "0.5"
 flate2 = { version = "^1.0.2", optional = true, default-features = false }
 
 [package.metadata.docs.rs]
-features = ["flate2-c", "encoding"]
+features = ["flate2-c", "encoding", "rt"]
 
 [features]
 default = ["flate2-c"]
+
+# Enables runtime
+rt = []
 
 # miniz-sys backend for flate2 crate
 flate2-c = ["flate2/miniz-sys"]

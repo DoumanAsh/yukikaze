@@ -337,3 +337,18 @@ fn decode_non_utf8() {
     let res = result.expect("Error with decoding text!");
     assert!(res.len() > 0);
 }
+
+#[cfg(feature = "rt")]
+#[test]
+fn test_global_client() {
+    use yukikaze::rt::AutoRuntime;
+
+    let client = client::Client::<TimeoutCfg>::new();
+    yukikaze::rt::set(client);
+
+    let request = client::request::Request::get(BIN_URL).expect("To create google get request").empty();
+
+    let result = yukikaze::rt::execute(request).finish();
+    println!("result={:?}", result);
+    assert!(result.is_err());
+}
