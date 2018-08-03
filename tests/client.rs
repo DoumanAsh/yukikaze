@@ -37,7 +37,7 @@ impl client::config::Config for TimeoutCfg {
 
 #[test]
 fn make_timeout() {
-    let request = client::request::Request::get(BIN_URL).expect("To create google get request").empty();
+    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
 
     let mut rt = get_tokio_rt();
 
@@ -50,7 +50,7 @@ fn make_timeout() {
 
 #[test]
 fn make_request_w_limited_body() {
-    let request = client::request::Request::get(BIN_URL).expect("To create google get request").empty();
+    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
 
     let mut rt = get_tokio_rt();
 
@@ -67,7 +67,7 @@ fn make_request_w_limited_body() {
 
 #[test]
 fn make_request() {
-    let request = client::Request::get(BIN_URL).expect("To create google get request")
+    let request = client::Request::get(BIN_URL).expect("To create get request")
                                               .basic_auth("Lolka", Some("Pass"))
                                               .empty();
 
@@ -104,7 +104,7 @@ struct BinGzippedRsp {
 
 #[test]
 fn make_request_w_gzip_body() {
-    let request = client::request::Request::get(BIN_GZIP).expect("To create google get request")
+    let request = client::request::Request::get(BIN_GZIP).expect("To create get request")
                                                          .accept_encoding(yukikaze::header::ContentEncoding::Gzip)
                                                          .empty();
 
@@ -127,7 +127,7 @@ fn make_request_w_gzip_body() {
 
 #[test]
 fn make_request_w_deflate_body() {
-    let request = client::request::Request::get(BIN_DEFLATE).expect("To create google get request")
+    let request = client::request::Request::get(BIN_DEFLATE).expect("To create get request")
                                                             .accept_encoding(yukikaze::header::ContentEncoding::Deflate)
                                                             .empty();
 
@@ -164,7 +164,7 @@ fn make_get_query() {
         name: "Test".to_owned(),
         password: "TestPassword".to_owned()
     };
-    let request = client::request::Request::get(BIN_GET).expect("To create google get request").query(&query).empty();
+    let request = client::request::Request::get(BIN_GET).expect("To create get request").query(&query).empty();
 
     let mut rt = get_tokio_rt();
 
@@ -186,7 +186,7 @@ fn make_get_query() {
 
 #[test]
 fn make_request_w_gzip_body_stored_as_file() {
-    let request = client::request::Request::get(BIN_GZIP).expect("To create google get request")
+    let request = client::request::Request::get(BIN_GZIP).expect("To create get request")
                                                          .accept_encoding(yukikaze::header::ContentEncoding::Gzip)
                                                          .empty();
 
@@ -341,14 +341,14 @@ fn decode_non_utf8() {
 #[cfg(feature = "rt")]
 #[test]
 fn test_global_client() {
-    use yukikaze::rt::AutoRuntime;
+    use yukikaze::rt::{AutoRuntime, AutoClient};
 
     let client = client::Client::<TimeoutCfg>::new();
     yukikaze::rt::set(client);
 
-    let request = client::request::Request::get(BIN_URL).expect("To create google get request").empty();
+    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
 
-    let result = yukikaze::rt::execute(request).finish();
+    let result = request.send().finish();
     println!("result={:?}", result);
     assert!(result.is_err());
 }

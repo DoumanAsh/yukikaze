@@ -8,7 +8,7 @@
 //!```rust
 //!extern crate yukikaze;
 //!use yukikaze::client;
-//!use yukikaze::rt::AutoRuntime;
+//!use yukikaze::rt::{AutoClient, AutoRuntime};
 //!
 //!let client = client::Client::default();
 //!//We set global client to be used anywhere
@@ -18,7 +18,7 @@
 //!                                       .expect("To create google get request")
 //!                                       .empty();
 //!
-//!let result = yukikaze::rt::execute(request).finish();
+//!let result = request.send().finish();
 //!println!("result={:?}", result);
 //!```
 
@@ -41,6 +41,12 @@ pub fn set<C: client::HttpClient + 'static>(client: C) {
     CLIENT.with(move |store| store.set(State::Client(Box::new(client))))
 }
 
+///Sets default client as global in thread local storage.
+pub fn set_default() {
+    let client = client::Client::default();
+    CLIENT.with(move |store| store.set(State::Client(Box::new(client))))
+}
+
 ///Executes HTTP request on global client
 pub fn execute(req: client::Request) -> client::response::FutureResponse {
     CLIENT.with(move |store| match store.replace(State::None) {
@@ -59,8 +65,22 @@ pub fn run<R: IntoFuture, F: FnOnce() -> R>(runner: F) -> Result<R::Item, R::Err
     tokio::executor::current_thread::block_on_all(runner().into_future())
 }
 
+///Trait to bootstrap your requests.
+pub trait AutoClient {
+    ///Sends request using default client.
+    fn send(self) -> client::response::FutureResponse;
+}
+
+impl AutoClient for client::Request {
+    #[inline]
+    fn send(self) -> client::response::FutureResponse {
+        execute(self)
+    }
+}
+
 ///Trait to bootstrap your futures.
 pub trait AutoRuntime: Future + Sized {
+    #[inline]
     ///Runs futures to competition.
     ///
     ///Under hood it uses tokio's current thread executor
