@@ -402,10 +402,8 @@ impl<J: DeserializeOwned> Json<J> {
     ///Use it when you need to control limit on your reads.
     pub fn limit(self, limit: u64) -> Self {
         match self {
-            Json::Init(Some(raw)) => {
-                Json::Init(Some(raw.limit(limit)))
-            }
-            _ => self
+            Json::Init(Some(raw)) => Json::Init(Some(raw.limit(limit))),
+            _ => self,
         }
     }
 
