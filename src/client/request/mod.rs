@@ -272,7 +272,7 @@ impl Builder {
             buffer.split_to(2);
             let cookie = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
 
-            let _ = self.headers().insert(http::header::AUTHORIZATION, cookie);
+            let _ = self.headers().insert(http::header::COOKIE, cookie);
         }
 
         let inner = HyperRequest::from_parts(self.parts, body.into());
