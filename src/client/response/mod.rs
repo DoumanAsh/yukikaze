@@ -215,34 +215,63 @@ impl DerefMut for Response {
 }
 
 #[derive(Debug)]
-///Describes possible response errors.
-pub enum ResponseError {
-    ///Response failed due to timeout
-    Timeout,
-    ///Hyper Error.
-    HyperError(hyper::error::Error)
+///Represents failed due to timeout request.
+///
+///It is possible to fire request again
+///In a case you suspect potential network problems
+///but you don't want to set too high timeout value for your
+///client you can rely on it to fire your request again.
+pub struct Timeout {
+    inner: hyper::client::ResponseFuture,
 }
 
-impl ResponseError {
-    fn from_deadline(error: tokio::timer::DeadlineError<hyper::error::Error>) -> Self {
-        match error.into_inner() {
-            Some(error) => ResponseError::HyperError(error),
-            None => ResponseError::Timeout,
+impl Timeout {
+    ///Starts request again with new timeout.
+    pub fn retry(self, timeout: time::Duration) -> FutureResponse {
+        FutureResponse::new(self.inner, timeout)
+    }
+}
+
+impl Into<Timeout> for hyper::client::ResponseFuture {
+    fn into(self) -> Timeout {
+        Timeout {
+            inner: self
         }
     }
+}
+
+#[derive(Debug)]
+///Describes possible response errors.
+pub enum ResponseError {
+    ///Response failed due to timeout.
+    Timeout(Timeout),
+    ///Hyper Error.
+    HyperError(hyper::error::Error),
+    ///Tokio timer threw error.
+    Timer(tokio::timer::Error, Timeout)
 }
 
 #[must_use = "Future must be polled to actually get HTTP response"]
 ///Ongoing HTTP request.
 pub struct FutureResponse {
-    inner: tokio::timer::Deadline<hyper::client::ResponseFuture>
+    inner: Option<hyper::client::ResponseFuture>,
+    delay: tokio::timer::Delay,
 }
 
 impl FutureResponse {
     pub(crate) fn new(inner: hyper::client::ResponseFuture, timeout: time::Duration) -> Self {
-        let inner = tokio::timer::Deadline::new(inner, tokio::clock::now() + timeout);
+        let delay = tokio::timer::Delay::new(tokio::clock::now() + timeout);
+
         Self {
-            inner
+            inner: Some(inner),
+            delay
+        }
+    }
+
+    fn into_timeout(&mut self) -> Timeout {
+        match self.inner.take() {
+            Some(inner) => inner.into(),
+            None => unreachable!()
         }
     }
 }
@@ -252,8 +281,20 @@ impl Future for FutureResponse {
     type Error = ResponseError;
 
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
-        let result = async_unwrap!(self.inner.poll().map_err(|error| ResponseError::from_deadline(error))?);
+        if let Some(inner) = self.inner.as_mut() {
+            match inner.poll() {
+                Ok(futures::Async::Ready(result)) => return Ok(futures::Async::Ready(result.into())),
+                Ok(futures::Async::NotReady) => (),
+                Err(error) => return Err(ResponseError::HyperError(error))
+            }
+        } else {
+            unreachable!();
+        }
 
-        Ok(futures::Async::Ready(result.into()))
+        match self.delay.poll() {
+            Ok(futures::Async::NotReady) => Ok(futures::Async::NotReady),
+            Ok(futures::Async::Ready(_)) => Err(ResponseError::Timeout(self.into_timeout())),
+            Err(error) => Err(ResponseError::Timer(error, self.into_timeout()))
+        }
     }
 }

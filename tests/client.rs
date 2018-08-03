@@ -31,7 +31,7 @@ pub struct TimeoutCfg;
 
 impl client::config::Config for TimeoutCfg {
     fn timeout() -> time::Duration {
-        time::Duration::from_millis(1)
+        time::Duration::from_millis(50)
     }
 }
 
@@ -46,6 +46,16 @@ fn make_timeout() {
     let result = rt.block_on(client.execute(request));
     println!("result={:?}", result);
     assert!(result.is_err());
+
+    let timeout = match result.unwrap_err() {
+        client::response::ResponseError::Timeout(timeout) => timeout,
+        _ => panic!("Unexpected error")
+    };
+
+    let result = rt.block_on(timeout.retry(time::Duration::from_secs(1)));
+    println!("result={:?}", result);
+    let result = result.expect("To have successful retry");
+    assert!(result.is_success());
 }
 
 #[test]

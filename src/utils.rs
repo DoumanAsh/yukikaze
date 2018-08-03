@@ -3,17 +3,6 @@ use ::bytes;
 use ::std::mem;
 use ::std::io;
 
-macro_rules! async_unwrap {
-    ($result:expr) => ({
-        use ::futures;
-
-        match $result {
-            futures::Async::Ready(result) => result,
-            futures::Async::NotReady => return Ok(futures::Async::NotReady)
-        }
-    })
-}
-
 pub(crate) struct BytesWriter {
     buf: bytes::BytesMut,
 }
