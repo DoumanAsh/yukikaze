@@ -197,7 +197,7 @@ impl Builder {
     pub fn add_cookie(mut self, cookie: cookie::Cookie<'static>) -> Self {
         if self.cookies.is_none() {
             let mut jar = cookie::CookieJar::new();
-            jar.add(cookie.into_owned());
+            jar.add(cookie);
             self.cookies = Some(jar);
         } else {
             self.cookies.as_mut().unwrap().add(cookie.into_owned());
