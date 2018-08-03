@@ -177,12 +177,12 @@ impl RawBody {
     }
 
     #[cfg(feature = "encoding")]
-    ///Retrieves content's encoding, if any.
+    ///Retrieves content's charset encoding, if any.
     ///
     ///If it is omitted, UTF-8 is assumed.
-    pub fn encoding(&self) -> Result<encoding::EncodingRef, errors::ContentTypeError> {
+    pub fn charset_encoding(&self) -> Result<encoding::EncodingRef, errors::ContentTypeError> {
         let mime = self.mime()?;
-        let mime = mime.as_ref().and_then(|mime| mime.get_param("charset"));
+        let mime = mime.as_ref().and_then(|mime| mime.get_param(mime::CHARSET));
 
         match mime {
             Some(charset) => match encoding::label::encoding_from_whatwg_label(charset.as_str()) {
@@ -349,7 +349,7 @@ impl Future for Text {
                 #[cfg(feature = "encoding")]
                 Text::Init(raw) => {
                     let raw = raw.take().expect("To have body");
-                    let encoding = raw.encoding().ok().and_then(|enc| match enc.name() {
+                    let encoding = raw.charset_encoding().ok().and_then(|enc| match enc.name() {
                         "utf-8" => None,
                         _ => Some(enc)
                     });
