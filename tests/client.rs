@@ -5,6 +5,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate etag;
 extern crate percent_encoding;
+extern crate cookie;
 
 use ::std::fs;
 use ::std::io;
@@ -22,6 +23,7 @@ const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 const BIN_JSON: &'static str = "http://httpbin.org/json";
 const BIN_BASIC_AUTH: &'static str = "http://httpbin.org/basic-auth";
 const BIN_ETAG: &'static str = "http://httpbin.org/etag";
+const BIN_COOKIE: &'static str = "http://httpbin.org/cookies";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -324,6 +326,54 @@ fn test_etag() {
     assert_eq!(rsp_etag, if_none_match);
 
     //TODO: it seems httpbin doesn't return 304 for some reason here
+}
+
+#[test]
+fn test_cookie() {
+    #[derive(Deserialize, Debug)]
+    struct CookiesJson {
+        cookies: Cookies
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct Cookies {
+        #[serde(rename = "WAIFU")]
+        waifu: String,
+        #[serde(rename = "First")]
+        first: String
+    }
+
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+
+    let request = client::request::Request::get(BIN_COOKIE).expect("Error with request!").empty();
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+    assert!(response.is_success());
+    assert!(response.cookies_iter().next().is_none());
+
+    const KEY: &'static str = "WAIFU";
+    const VALUE: &'static str = "YUKIKAZE";
+    let url = format!("{}/set/{}/{}", BIN_COOKIE, KEY, VALUE);
+
+    let request = client::request::Request::get(&url).expect("Error with request!").empty();
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+    assert!(response.is_redirect());
+    let cookie = response.cookies_iter().next().expect("To have cookie").expect("To parse cookie");
+    assert_eq!(cookie.name(), KEY);
+    assert_eq!(cookie.value(), VALUE);
+
+    let extra_cookie = cookie::Cookie::build("First", "Mehisha").path("/").http_only(true).finish();
+    let request = client::request::Request::get(BIN_COOKIE).expect("Error with request!").add_cookie(cookie.into_owned()).add_cookie(extra_cookie).empty();
+    println!("request={:?}", request);
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+    println!("response={:?}", response);
+    assert!(response.is_success());
+
+    let json = response.json::<CookiesJson>();
+    let result = rt.block_on(json);
+    let res = result.expect("Error with json!");
+    assert_eq!(res.cookies.waifu, VALUE);
+    assert_eq!(res.cookies.first, "Mehisha");
 }
 
 #[cfg(feature = "encoding")]

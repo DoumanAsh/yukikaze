@@ -138,7 +138,19 @@ impl Response {
     }
 
     #[inline]
-    ///Retrieves owned cookies from `Set-Cookie` header.
+    ///Creates jar from cookies in response.
+    pub fn cookies_jar(&self) -> Result<cookie::CookieJar, cookie::ParseError> {
+        let mut jar = cookie::CookieJar::new();
+
+        for cook in self.cookies_iter() {
+            jar.add(cook?.into_owned());
+        }
+
+        Ok(jar)
+    }
+
+    #[inline]
+    ///Retrieves all cookies from `Set-Cookie` headers.
     pub fn cookies(&self) -> Result<Vec<cookie::Cookie<'static>>, cookie::ParseError> {
         let mut cookies = Vec::new();
 

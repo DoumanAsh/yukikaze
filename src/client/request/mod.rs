@@ -175,9 +175,26 @@ impl Builder {
         self
     }
 
-    #[inline]
+    ///Sets cookie jar to request.
+    ///
+    ///If jar already exists, the cookies from jar
+    ///are appended.
+    pub fn set_cookie_jar(mut self, jar: cookie::CookieJar) -> Self {
+        if self.cookies.is_none() {
+            self.cookies = Some(jar);
+        } else {
+            let self_jar = self.cookies.as_mut().unwrap();
+
+            for cookie in jar.iter().cloned() {
+                self_jar.add(cookie.into_owned());
+            }
+        }
+
+        self
+    }
+
     ///Adds cookie.
-    pub fn add_cookie<'c>(mut self, cookie: cookie::Cookie<'c>) -> Self {
+    pub fn add_cookie(mut self, cookie: cookie::Cookie<'static>) -> Self {
         if self.cookies.is_none() {
             let mut jar = cookie::CookieJar::new();
             jar.add(cookie.into_owned());
