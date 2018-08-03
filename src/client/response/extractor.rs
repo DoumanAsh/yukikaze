@@ -98,7 +98,7 @@ impl From<hyper::Error> for BodyReadError {
 
 enum BodyType {
     Plain(hyper::Body, bytes::BytesMut),
-    Deflate(hyper::Body, flate2::write::DeflateDecoder<utils::BytesWriter>),
+    Deflate(hyper::Body, flate2::write::ZlibDecoder<utils::BytesWriter>),
     Gzip(hyper::Body, flate2::write::GzDecoder<utils::BytesWriter>),
 }
 
@@ -109,9 +109,8 @@ enum BodyType {
 ///
 ///The method with which to read body determined by `Content-Encoding` header.
 ///
-///Note that `ContentEncoding::Deflate` may have potential problem with particular
-///way to compress it. For example httpbin `/deflate` endpoint compresses the data
-///in unsupported by `flate2` crate way. Relevant [issue](https://github.com/requests/httpbin/issues/419)
+///Note that `ContentEncoding::Deflate` supports zlib encoded data with deflate compression.
+///Plain deflate is non-conforming and not supported.
 pub struct RawBody {
     parts: http::response::Parts,
     body: BodyType,
@@ -131,7 +130,7 @@ impl RawBody {
 
         let body = match encoding {
             #[cfg(feature = "flate2")]
-            header::ContentEncoding::Deflate => BodyType::Deflate(body, flate2::write::DeflateDecoder::new(utils::BytesWriter::with_capacity(buffer_size))),
+            header::ContentEncoding::Deflate => BodyType::Deflate(body, flate2::write::ZlibDecoder::new(utils::BytesWriter::with_capacity(buffer_size))),
             #[cfg(feature = "flate2")]
             header::ContentEncoding::Gzip => BodyType::Gzip(body, flate2::write::GzDecoder::new(utils::BytesWriter::with_capacity(buffer_size))),
             _ => BodyType::Plain(body, bytes::BytesMut::with_capacity(buffer_size)),
@@ -433,7 +432,7 @@ impl<J: DeserializeOwned> Future for Json<J> {
 
 enum FileBodyType {
     Plain(hyper::Body, Option<io::BufWriter<fs::File>>),
-    Deflate(hyper::Body, Option<flate2::write::DeflateDecoder<io::BufWriter<fs::File>>>),
+    Deflate(hyper::Body, Option<flate2::write::ZlibDecoder<io::BufWriter<fs::File>>>),
     Gzip(hyper::Body, Option<flate2::write::GzDecoder<io::BufWriter<fs::File>>>),
 }
 
@@ -452,7 +451,7 @@ impl FileBody {
 
         let body = match encoding {
             #[cfg(feature = "flate2")]
-            header::ContentEncoding::Deflate => FileBodyType::Deflate(body, Some(flate2::write::DeflateDecoder::new(file))),
+            header::ContentEncoding::Deflate => FileBodyType::Deflate(body, Some(flate2::write::ZlibDecoder::new(file))),
             #[cfg(feature = "flate2")]
             header::ContentEncoding::Gzip => FileBodyType::Gzip(body, Some(flate2::write::GzDecoder::new(file))),
             _ => FileBodyType::Plain(body, Some(file)),

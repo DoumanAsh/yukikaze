@@ -17,7 +17,7 @@ use yukikaze::client::HttpClient;
 
 const BIN_URL: &'static str = "https://httpbin.org";
 const BIN_GET: &'static str = "https://httpbin.org/get";
-const BIN_DEFLATE: &'static str = "https://api.stackexchange.com/2.2/answers?site=stackoverflow&pagesize=10";
+const BIN_DEFLATE: &'static str = "https://httpbin.org/deflate";
 const BIN_GZIP: &'static str = "https://httpbin.org/gzip";
 const BIN_JSON: &'static str = "http://httpbin.org/json";
 const BIN_BASIC_AUTH: &'static str = "http://httpbin.org/basic-auth";
