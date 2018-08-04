@@ -217,7 +217,7 @@ impl Builder {
     #[inline]
     ///Sets `Accept-Encoding` header.
     ///
-    ///Replaces previous value, if any..
+    ///Replaces previous value, if any.
     pub fn accept_encoding(self, encoding: header::ContentEncoding) -> Self {
         self.set_header(header::ACCEPT_ENCODING, encoding.as_str())
     }
