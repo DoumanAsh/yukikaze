@@ -42,20 +42,30 @@ fn main() {
 
 ## Q&A
 
+- - -
+
 **Q:** Why not just use [reqwest](https://github.com/seanmonstar/reqwest)/[actix-web](https://github.com/actix/actix-web)/[mio_httpc](https://github.com/SergejJurecko/mio_httpc)?
 
 **A:** Reqwest doesn't use rustls, actix-web client comes with lots of server code and mio_httpc is
 unknown beast to me(I just found out about it when created Yukikaze).
 
+- - -
+
 **Q:** I see some moon runes and anime picture. Are you one of these disgusting weebs?
 
 **A:** Obviously yes ;)
+
+- - -
 
 **Q:** Why so many inlines? Are you this stupid to use pre-mature optimizations!?
 
 **A:** Yes, I'm stupid enough because compiler doesn't want inline methods across crates by default(unless you turn on LTO)
 
+- - -
+
 **Q:** Why builder methods panic? Why don't you store error in builder and return it when finishing creating request?
 
 **A:** I believe in normal cases you are not supposed to create invalid requests so I consider such
 errors as quite exceptional
+
+- - -
