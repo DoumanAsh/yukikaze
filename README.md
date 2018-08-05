@@ -42,8 +42,6 @@ fn main() {
 
 ## Q&A
 
-- - -
-
 **Q:** Why not just use [reqwest](https://github.com/seanmonstar/reqwest)/[actix-web](https://github.com/actix/actix-web)/[mio_httpc](https://github.com/SergejJurecko/mio_httpc)?
 
 **A:** Reqwest doesn't use rustls, actix-web client comes with lots of server code and mio_httpc is
