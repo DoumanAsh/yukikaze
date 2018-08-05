@@ -226,43 +226,6 @@ impl DerefMut for Response {
     }
 }
 
-#[derive(Debug)]
-///Represents failed due to timeout request.
-///
-///It is possible to fire request again
-///In a case you suspect potential network problems
-///but you don't want to set too high timeout value for your
-///client you can rely on it to fire your request again.
-pub struct Timeout {
-    inner: hyper::client::ResponseFuture,
-}
-
-impl Timeout {
-    ///Starts request again with new timeout.
-    pub fn retry(self, timeout: time::Duration) -> FutureResponse {
-        FutureResponse::new(self.inner, timeout)
-    }
-}
-
-impl Into<Timeout> for hyper::client::ResponseFuture {
-    fn into(self) -> Timeout {
-        Timeout {
-            inner: self
-        }
-    }
-}
-
-#[derive(Debug)]
-///Describes possible response errors.
-pub enum ResponseError {
-    ///Response failed due to timeout.
-    Timeout(Timeout),
-    ///Hyper Error.
-    HyperError(hyper::error::Error),
-    ///Tokio timer threw error.
-    Timer(tokio::timer::Error, Timeout)
-}
-
 #[must_use = "Future must be polled to actually get HTTP response"]
 ///Ongoing HTTP request.
 pub struct FutureResponse {
@@ -280,7 +243,7 @@ impl FutureResponse {
         }
     }
 
-    fn into_timeout(&mut self) -> Timeout {
+    fn into_timeout(&mut self) -> errors::Timeout {
         match self.inner.take() {
             Some(inner) => inner.into(),
             None => unreachable!()
@@ -290,14 +253,14 @@ impl FutureResponse {
 
 impl Future for FutureResponse {
     type Item = Response;
-    type Error = ResponseError;
+    type Error = errors::ResponseError;
 
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
         if let Some(inner) = self.inner.as_mut() {
             match inner.poll() {
                 Ok(futures::Async::Ready(result)) => return Ok(futures::Async::Ready(result.into())),
                 Ok(futures::Async::NotReady) => (),
-                Err(error) => return Err(ResponseError::HyperError(error))
+                Err(error) => return Err(errors::ResponseError::HyperError(error))
             }
         } else {
             unreachable!();
@@ -305,8 +268,8 @@ impl Future for FutureResponse {
 
         match self.delay.poll() {
             Ok(futures::Async::NotReady) => Ok(futures::Async::NotReady),
-            Ok(futures::Async::Ready(_)) => Err(ResponseError::Timeout(self.into_timeout())),
-            Err(error) => Err(ResponseError::Timer(error, self.into_timeout()))
+            Ok(futures::Async::Ready(_)) => Err(errors::ResponseError::Timeout(self.into_timeout())),
+            Err(error) => Err(errors::ResponseError::Timer(error, self.into_timeout()))
         }
     }
 }

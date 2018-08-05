@@ -8,6 +8,42 @@
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default on.
 //!- `encoding` - Enables encoding crate support. Default off.
 //!- `rt` - Enables runtime module. Default off.
+//!
+//!## Usage
+//!
+//!In order to use Yukikaze-sama you need to create [Client](client/struct.Client.html).
+//!
+//!Configuration of of client can be defined using trait parameter [Config](client/config/trait.Config.html).
+//!But default configuration in most cases reasonable for simple requests.
+//!
+//!But if you need to work with client in generic context you can use its trait [HttpClient](client/trait.HttpClient.html).
+//!
+//!### Making request
+//!
+//!Request [builder](client/request/struct.Builder.html) provides rich set of methods
+//!to configure it, but in simple terms making request boils down to following code:
+//!
+//!```rust
+//!extern crate yukikaze;
+//!extern crate tokio;
+//!
+//!use yukikaze::client::{Client, HttpClient, Request};
+//!
+//!fn main() {
+//!    let mut tokio_rt = tokio::runtime::current_thread::Runtime::new().expect("To create runtime");
+//!    let client = Client::default();
+//!
+//!    let request = Request::get("http://127.0.0.1").expect("To create get request").empty();
+//!
+//!    let response = client.execute(request); //Creates future response
+//!    let response = tokio_rt.block_on(response); //Waits for response
+//!
+//!    println!("response={:?}", response);
+//!}
+//!```
+//!
+//!You can use `rt` module to simplify your workflow though.
+//!
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 

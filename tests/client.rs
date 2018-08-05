@@ -50,7 +50,7 @@ fn make_timeout() {
     assert!(result.is_err());
 
     let timeout = match result.unwrap_err() {
-        client::response::ResponseError::Timeout(timeout) => timeout,
+        client::response::errors::ResponseError::Timeout(timeout) => timeout,
         _ => panic!("Unexpected error")
     };
 
