@@ -57,7 +57,7 @@ pub trait Config {
 
         if !request.headers().contains_key(header::HOST) {
             let host = request.uri().host().and_then(|host| match request.uri().port() {
-                None | Some(80) => header::HeaderValue::from_str(host).ok(),
+                None | Some(80) | Some(443) => header::HeaderValue::from_str(host).ok(),
                 Some(port) => {
                     let mut buffer = utils::BytesWriter::with_capacity(host.len() + 5);
                     let _ = write!(&mut buffer, "{}:{}", host, port);
