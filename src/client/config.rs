@@ -1,9 +1,13 @@
 //!Describes client configuration
 
+use ::std::io::Write;
 use ::std::time;
 
+use ::http;
 use ::header;
 use ::hyper;
+
+use ::utils;
 
 ///Generic config trait.
 ///
@@ -42,10 +46,29 @@ pub trait Config {
     ///It is called as soon as request is being sent out,
     ///but before `Accept-Encoding` is set.
     ///
-    ///By default it sets Yukikaze-sama user's agent.
-    fn default_headers(headers: &mut header::HeaderMap) {
-        if !headers.contains_key(header::USER_AGENT) {
-            headers.insert(header::USER_AGENT, header::HeaderValue::from_static(concat!("Yukikaze/", env!("CARGO_PKG_VERSION"))));
+    ///By default it sets following, if not present:
+    ///
+    ///- Yukikaze-sama's user-agent
+    ///- `HOST` header with host, and optionally port, taken from URI.
+    fn default_headers(request: &mut super::Request) {
+        if !request.headers().contains_key(header::USER_AGENT) {
+            request.headers_mut().insert(header::USER_AGENT, header::HeaderValue::from_static(concat!("Yukikaze/", env!("CARGO_PKG_VERSION"))));
+        }
+
+        if !request.headers().contains_key(header::HOST) {
+            let host = request.uri().host().and_then(|host| match request.uri().port() {
+                None | Some(80) => header::HeaderValue::from_str(host).ok(),
+                Some(port) => {
+                    let mut buffer = utils::BytesWriter::with_capacity(host.len() + 5);
+                    let _ = write!(&mut buffer, "{}:{}", host, port);
+
+                    http::header::HeaderValue::from_shared(buffer.freeze()).ok()
+                },
+            });
+
+            if let Some(host) = host {
+                request.headers_mut().insert(header::HOST, host);
+            }
         }
     }
 

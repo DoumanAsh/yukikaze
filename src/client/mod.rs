@@ -50,12 +50,12 @@ impl<C: config::Config> Client<C> {
 }
 
 impl<C: config::Config> HttpClient for Client<C> {
-    fn execute(&self, request: request::Request) -> response::FutureResponse {
+    fn execute(&self, mut request: request::Request) -> response::FutureResponse {
         const DEFAULT_COMPRESS: &'static str = "gzip, deflate";
 
-        let mut request = request.inner;
+        C::default_headers(&mut request);
 
-        C::default_headers(request.headers_mut());
+        let mut request = request.inner;
 
         #[cfg(feature = "flate2")]
         {
