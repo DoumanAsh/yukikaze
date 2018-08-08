@@ -22,47 +22,65 @@
 //!println!("result={:?}", result);
 //!```
 
-use ::tokio;
+use ::tokio::runtime::current_thread::Runtime;
 use ::futures::{IntoFuture, Future};
 
 use ::std::cell::Cell;
 
 use ::client;
 
-enum State {
-    None,
-    Client(Box<client::HttpClient>),
-}
-
-thread_local!(static CLIENT: Cell<State> = Cell::new(State::None));
+thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(Some(Runtime::new().expect("To crate tokio runtime"))));
+thread_local!(static CLIENT: Cell<Option<Box<client::HttpClient>>> = Cell::new(None));
 
 ///Sets global client in thread local storage.
 pub fn set<C: client::HttpClient + 'static>(client: C) {
-    CLIENT.with(move |store| store.set(State::Client(Box::new(client))))
+    CLIENT.with(move |store| store.set(Some(Box::new(client))))
 }
 
 ///Sets default client as global in thread local storage.
 pub fn set_default() {
     let client = client::Client::default();
-    CLIENT.with(move |store| store.set(State::Client(Box::new(client))))
+    CLIENT.with(move |store| store.set(Some(Box::new(client))))
 }
 
 ///Executes HTTP request on global client
 pub fn execute(req: client::Request) -> client::response::FutureResponse {
-    CLIENT.with(move |store| match store.replace(State::None) {
-        State::Client(client) => {
+    CLIENT.with(move |store| match store.replace(None) {
+        Some(client) => {
             let res = client.execute(req);
-            store.set(State::Client(client));
+            store.set(Some(client));
             res
         },
-        State::None => panic!("Client is not set"),
+        None => panic!("Client is not set"),
     })
 }
 
-///Starts function within tokio runtime and finishes
-///as soon as all futures are resolved.
+///Starts function within tokio runtime that returns future
+///and waits for it to finish
+///
+///Yukikaze-sama uses `current_thread` runtime internally which
+///is stored in `thread_local` storage.
+///
+///## Note
+///
+///It must not be used within blocking call like [run](fn.run.html)
 pub fn run<R: IntoFuture, F: FnOnce() -> R>(runner: F) -> Result<R::Item, R::Error> {
-    tokio::executor::current_thread::block_on_all(runner().into_future())
+    runner().into_future().finish()
+}
+
+///Spawns future on runtime's event loop.
+///
+///## Note
+///
+///It must not be used within blocking call like [run](fn.run.html)
+pub fn spawn<F: Future<Item=(), Error=()> + 'static>(fut: F) {
+    TOKIO.with(|rt| match rt.replace(None) {
+        Some(mut tokio) => {
+            tokio.spawn(fut);
+            rt.set(Some(tokio));
+        },
+        None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
+    });
 }
 
 ///Trait to bootstrap your requests.
@@ -80,14 +98,23 @@ impl AutoClient for client::Request {
 
 ///Trait to bootstrap your futures.
 pub trait AutoRuntime: Future + Sized {
-    #[inline]
     ///Runs futures to competition.
     ///
-    ///Under hood it uses tokio's current thread executor
-    ///that runs this future and all others which are spawn by it
-    ///to its competition.
+    ///Yukikaze-sama uses `current_thread` runtime internally which
+    ///is stored in `thread_local` storage.
+    ///
+    ///## Note
+    ///
+    ///It must not be used within blocking call like [run](fn.run.html)
     fn finish(self) -> Result<Self::Item, Self::Error> {
-        tokio::executor::current_thread::block_on_all(self)
+        TOKIO.with(|rt| match rt.replace(None) {
+            Some(mut tokio) => {
+                let res = tokio.block_on(self);
+                rt.set(Some(tokio));
+                res
+            },
+            None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
+        })
     }
 }
 
