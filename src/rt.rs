@@ -22,7 +22,7 @@
 //!println!("result={:?}", result);
 //!```
 
-use ::tokio::runtime::current_thread::Runtime;
+use ::tokio::runtime::current_thread::{Runtime, Handle};
 use ::futures::{IntoFuture, Future};
 
 use ::std::cell::Cell;
@@ -81,6 +81,18 @@ pub fn spawn<F: Future<Item=(), Error=()> + 'static>(fut: F) {
         },
         None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
     });
+}
+
+///Retrieves tokio's handle.
+pub fn handle() -> Handle {
+    TOKIO.with(|rt| match rt.replace(None) {
+        Some(tokio) => {
+            let res = tokio.handle();
+            rt.set(Some(tokio));
+            res
+        },
+        None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
+    })
 }
 
 ///Trait to bootstrap your requests.
