@@ -1,8 +1,3 @@
-//!Headers module
-
-pub use ::http::header::*;
-
-#[derive(Debug)]
 ///`Content-Encoding` header
 pub enum ContentEncoding {
     ///Indicates that no compression is taken place.
@@ -16,7 +11,6 @@ pub enum ContentEncoding {
 }
 
 impl ContentEncoding {
-    #[inline]
     ///Returns whether encoding indicates compression or not
     pub fn is_compression(&self) -> bool {
         match *self {
@@ -25,7 +19,6 @@ impl ContentEncoding {
         }
     }
 
-    #[inline]
     ///Returns whether Yukikaze-sama can decompress.
     ///
     ///Based on enabled features.
@@ -42,7 +35,6 @@ impl ContentEncoding {
         }
     }
 
-    #[inline]
     ///Returns textual representation.
     pub fn as_str(&self) -> &'static str {
         match *self {
