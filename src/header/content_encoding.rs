@@ -1,3 +1,5 @@
+
+#[derive(Debug)]
 ///`Content-Encoding` header
 pub enum ContentEncoding {
     ///Indicates that no compression is taken place.
