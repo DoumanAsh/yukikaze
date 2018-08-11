@@ -130,6 +130,15 @@ impl Response {
     }
 
     #[inline]
+    ///Retrieves `Content-Disposition`, if it valid one is present.
+    pub fn content_disposition(&self) -> Option<header::ContentDisposition> {
+        self.inner.headers()
+                  .get(header::CONTENT_DISPOSITION)
+                  .and_then(|header| header.to_str().ok())
+                  .and_then(|header| header::ContentDisposition::from_str(header))
+    }
+
+    #[inline]
     ///Creates iterator of cookie from `Set-Cookie` header.
     pub fn cookies_iter(&self) -> extractor::CookieIter {
         extractor::CookieIter {

@@ -222,6 +222,19 @@ impl Builder {
         self.set_header(header::ACCEPT_ENCODING, encoding.as_str())
     }
 
+    ///Sets `Content-Disposition` header.
+    ///
+    ///Replaces previous value, if any.
+    pub fn content_disposition(mut self, disp: &header::ContentDisposition) -> Self {
+        let mut buffer = utils::BytesWriter::new();
+
+        let _ = write!(&mut buffer, "{}", disp);
+        let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+
+        self.headers().insert(header::CONTENT_DISPOSITION, value);
+        self
+    }
+
     ///Adds authentication header.
     pub fn basic_auth<U: fmt::Display, P: fmt::Display>(mut self, username: U, password: Option<P>) -> Self {
         const BASIC: &'static str = "basic ";

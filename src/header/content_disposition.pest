@@ -1,0 +1,36 @@
+inline = {
+    ^"inline"
+}
+
+quote = _ { "\"" }
+
+filename_key = _{
+    ^"filename"
+}
+
+filename_value = {
+    (!quote ~ any)+
+}
+
+filename_value_ext = {
+    (!";" ~ any)+
+}
+
+filename = {
+    filename_key ~ (
+        (!"*" ~ "=" ~ quote{0, 1} ~ filename_value ~ quote{0, 1}) |
+        ("*" ~ "=" ~ filename_value_ext)
+    )
+}
+
+param = {
+    filename
+}
+
+attachment = {
+    ^"attachment" ~ ("; " ~ param)*
+}
+
+disposition = {
+    inline | attachment
+}

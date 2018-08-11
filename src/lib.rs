@@ -66,6 +66,10 @@ pub extern crate flate2;
 pub extern crate encoding;
 extern crate hyper_rustls;
 
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
+
 #[macro_use]
 mod utils;
 pub mod header;

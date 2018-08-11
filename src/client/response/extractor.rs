@@ -462,6 +462,16 @@ impl FileBody {
     }
 
     #[inline]
+    ///Retrieves `Content-Disposition`, if it valid one is present.
+    pub fn content_disposition(&self) -> Option<header::ContentDisposition> {
+        self.parts.headers
+                  .get(header::CONTENT_DISPOSITION)
+                  .and_then(|header| header.to_str().ok())
+                  .and_then(|header| header::ContentDisposition::from_str(header))
+    }
+
+
+    #[inline]
     ///Retrieves length of content to receive, if `Content-Length` exists.
     pub fn content_len(&self) -> Option<u64> {
         self.parts.headers
