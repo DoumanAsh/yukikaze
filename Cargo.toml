@@ -9,6 +9,7 @@ license = "Apache-2.0"
 keywords = ["http", "http-client"]
 include = [
     "**/*.rs",
+    "**/*.pest",
     "Cargo.toml",
     "README.md"
 ]
