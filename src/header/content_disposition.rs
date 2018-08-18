@@ -24,6 +24,17 @@ pub enum Filename {
     Extended(String, Option<String>, Vec<u8>)
 }
 
+impl Filename {
+    #[inline]
+    ///Returns whether filename is of extended type.
+    pub fn is_extended(&self) -> bool {
+        match self {
+            Filename::Extended(_, _, _) => true,
+            _ => false
+        }
+    }
+}
+
 #[derive(Debug)]
 /// A `Content-Disposition` header, defined in [RFC6266](https://tools.ietf.org/html/rfc6266).
 ///
@@ -35,7 +46,32 @@ pub enum ContentDisposition {
     ///Tells that content should be displayed inside web page.
     Inline,
     ///Tells that content should be downloaded.
-    Attachment(Filename)
+    Attachment(Filename),
+    ///Tells that content is field of form with name and filename
+    ///
+    ///## Note
+    ///
+    ///This is an extension that can be used only inside of multipart
+    ///body, it is not expected value for header.
+    FormData(Option<String>, Filename)
+}
+
+macro_rules! parse_file_ext {
+    ($param:ident) => {{
+        let mut parts = $param.as_str().splitn(3, '\'');
+
+        let charset = match parts.next() {
+            Some(charset) => charset.to_owned(),
+            None => continue
+        };
+        let lang = parts.next().map(|lang| lang.to_owned());
+        let value: Vec<u8> = match parts.next() {
+            Some(value) => percent_decode(value.as_bytes()).collect(),
+            None => continue
+        };
+
+        Filename::Extended(charset, lang, value)
+    }}
 }
 
 impl ContentDisposition {
@@ -65,20 +101,8 @@ impl ContentDisposition {
                                     file_name = Filename::Name(Some(param.as_str().trim().to_owned()));
                                 },
                                 Rule::filename_value_ext => {
-                                    let mut parts = param.as_str().splitn(3, '\'');
-
-                                    let charset = match parts.next() {
-                                        Some(charset) => charset.to_owned(),
-                                        None => continue
-                                    };
-                                    let lang = parts.next().map(|lang| lang.to_owned());
-                                    let value: Vec<u8> = match parts.next() {
-                                        Some(value) => percent_decode(value.as_bytes()).collect(),
-                                        None => continue
-                                    };
-
-                                    file_name = Filename::Extended(charset, lang, value);
-                                    //exte should have priority so break here.
+                                    file_name = parse_file_ext!(param);
+                                    //extended should have priority so break here.
                                     break;
                                 },
                                 _ => ()
@@ -90,6 +114,41 @@ impl ContentDisposition {
 
                 ContentDisposition::Attachment(file_name)
             },
+            Rule::form_data => {
+                let mut name = None;
+                let mut file_name = Filename::Name(None);
+
+                let result = result.into_inner()
+                                   .map(|param| param.into_inner().next().unwrap()) //Skip param
+                                   .map(|param| (param.as_rule(), param.into_inner().next().expect("value"))); //Take key's rule and value's match
+
+                for (rule, param) in result {
+                    match rule {
+                        Rule::filename => {
+                            match param.as_rule() {
+                                Rule::filename_value => {
+                                    file_name = Filename::Name(Some(param.as_str().trim().to_owned()));
+                                },
+                                Rule::filename_value_ext => {
+                                    file_name = parse_file_ext!(param);
+                                },
+                                _ => ()
+                            }
+                        },
+                        Rule::form_name => {
+                            match param.as_rule() {
+                                Rule::form_name_value => {
+                                    name = Some(param.as_str().trim().to_owned());
+                                },
+                                _ => ()
+                            }
+                        }
+                        _ => ()
+                    }
+                }
+
+                ContentDisposition::FormData(name, file_name)
+            }
             _ => return None
         };
 
@@ -101,7 +160,7 @@ impl fmt::Display for ContentDisposition {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ContentDisposition::Inline => write!(f, "inline"),
-            ContentDisposition::Attachment(file) => match file {
+            ContentDisposition::Attachment(file) | ContentDisposition::FormData(None, file) => match file {
                 Filename::Name(Some(name)) => write!(f, "attachment; filename=\"{}\"", name),
                 Filename::Name(None) => write!(f, "attachment"),
                 Filename::Extended(charset, lang, value) => {
@@ -111,6 +170,17 @@ impl fmt::Display for ContentDisposition {
                            percent_encode(&value, USERINFO_ENCODE_SET).to_string())
                 },
             },
+            ContentDisposition::FormData(Some(name), file) => match file {
+                Filename::Name(Some(file_name)) => write!(f, "form-data; name=\"{}\"; filename=\"{}\"", name, file_name),
+                Filename::Name(None) => write!(f, "form-data; name=\"{}\"", name),
+                Filename::Extended(charset, lang, value) => {
+                    write!(f, "form-data; name=\"{}\"; filename*={}'{}'{}",
+                           name,
+                           charset,
+                           lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
+                           percent_encode(&value, USERINFO_ENCODE_SET).to_string())
+                },
+            }
         }
     }
 }
@@ -139,7 +209,7 @@ mod tests {
     fn parse_attach_disp_wo_filename() {
         const INPUT: &'static str = "attachment; filename";
 
-        let result = ContentDisposition::from_str(INPUT).expect("To have inline Disposition");
+        let result = ContentDisposition::from_str(INPUT).expect("To have attachment Disposition");
 
         let result_text = result.to_string();
 
@@ -158,9 +228,9 @@ mod tests {
 
     #[test]
     fn parse_attach_disp_w_filename() {
-        const INPUT: &'static str = "attachment; filename=\"lolka.jpg\"; filename=\"lolka2.jpg\"";
+        const INPUT: &'static str = "attachment; filename=\"lolka.jpg\";filename=\"lolka2.jpg\"";
 
-        let result = ContentDisposition::from_str(INPUT).expect("To have inline Disposition");
+        let result = ContentDisposition::from_str(INPUT).expect("To have attachment Disposition");
 
         let result_text = result.to_string();
 
@@ -179,9 +249,10 @@ mod tests {
 
     #[test]
     fn parse_attach_disp_w_filename_ext() {
-        const INPUT: &'static str = "attachment; filename*=UTF-8'en'%C2%A3%20and%20%E2%82%AC%20rates";
+        const EXPECT_INPUT: &'static str = "attachment; filename*=UTF-8'en'%C2%A3%20and%20%E2%82%AC%20rates";
+        const INPUT: &'static str = "attachment;\t filename*=UTF-8'en'%C2%A3%20and%20%E2%82%AC%20rates";
 
-        let result = ContentDisposition::from_str(INPUT).expect("To have inline Disposition");
+        let result = ContentDisposition::from_str(INPUT).expect("To have attachment Disposition");
 
         let result_text = result.to_string();
 
@@ -200,7 +271,30 @@ mod tests {
             _ => panic!("Invalid Content Disposition")
         }
 
-        assert_eq!(result_text, INPUT);
+        assert_eq!(result_text, EXPECT_INPUT);
+    }
+
+    #[test]
+    fn parse_form_data() {
+        const EXPECT_INPUT: &'static str = "form-data; name=\"lolka\"; filename=\"lolka.jpg\"";
+        const INPUT: &'static str = "form-data;\t name=\"lolka\";filename=\"lolka.jpg\"";
+
+        let result = ContentDisposition::from_str(INPUT).expect("To have form-data Disposition");
+
+        let result_text = result.to_string();
+
+        match result {
+            ContentDisposition::FormData(name, file) => {
+                assert_eq!(name.expect("To have form-data name"), "lolka");
+                match file {
+                    Filename::Name(name) => assert_eq!(name.expect("Filename value"), "lolka.jpg"),
+                    _ => panic!("Wrong Filename type"),
+                }
+            },
+            _ => panic!("Invalid Content Disposition")
+        }
+
+        assert_eq!(result_text, EXPECT_INPUT);
     }
 
 }
