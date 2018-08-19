@@ -26,7 +26,13 @@ impl Form {
     }
 
     ///Creates new instance with provided boundary.
+    ///
+    ///# Panic
+    ///
+    ///In debug builds, it asserts whether string contains only ASCII characters or not.
     pub fn with_boundary(boundary: &'static str) -> Self {
+        debug_assert!(boundary.is_ascii());
+
         Self {
             boundary,
             storage: BytesWriter::new()
