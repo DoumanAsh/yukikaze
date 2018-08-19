@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.0.7"
+version = "0.1.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and cute HTTP client library."
 readme = "README.md"
@@ -29,6 +29,7 @@ cookie = "0.11"
 percent-encoding = "1"
 etag = "1"
 mime = "0.3"
+mime_guess = "^2.0.0-alpha.6"
 
 encoding = { version = "0.2", optional = true }
 data-encoding = "2"

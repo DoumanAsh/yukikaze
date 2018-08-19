@@ -2,7 +2,11 @@
 
 use ::bytes::Bytes;
 use ::mime::Mime;
+use ::mime_guess::guess_mime_type;
 
+use ::std::path;
+use ::std::fs;
+use ::std::io;
 use ::std::io::Write;
 
 use ::header::{ContentDisposition, Filename};
@@ -56,6 +60,47 @@ impl Form {
         let _ = write!(&mut self.storage, "\r\n--{}\r\n", self.boundary);
     }
 
+    ///Adds file to the form.
+    ///
+    ///# Note
+    ///
+    ///It reads entire file into buffer.
+    ///
+    ///# IO Error
+    ///
+    ///If error happens file copying content of file,
+    ///then content of storage shall be restored to its state
+    ///before starting the operation.
+    pub fn add_file<P: AsRef<path::Path>>(&mut self, field_name: String, path: P) -> io::Result<()> {
+        let original_len = self.storage.len();
+
+        let path = path.as_ref();
+
+        let mut file = fs::File::open(&path)?;
+        let file_name = match path.file_name().and_then(|file_name| file_name.to_str()) {
+            Some(file_name) => Filename::with_encoded_name(file_name.to_string()),
+            None => Filename::new(),
+        };
+        let file_meta = file.metadata()?;
+        let file_len = file_meta.len() as usize;
+        let mime = guess_mime_type(&path);
+
+        let content_disposition = ContentDisposition::FormData(Some(field_name), file_name);
+        let _ = write!(&mut self.storage, "--{}\r\nContent-Disposition: {}\r\n", self.boundary, content_disposition);
+        let _ = write!(&mut self.storage, "Content-Type: {}\r\n\r\n", mime);
+
+        self.storage.reserve(file_len);
+        //If error happens we must clean up
+        if let Err(error) = io::copy(&mut file, &mut self.storage) {
+            self.storage.split_off(original_len);
+            return Err(error);
+        }
+
+        let _ = write!(&mut self.storage, "\r\n--{}\r\n", self.boundary);
+
+        Ok(())
+    }
+
     ///Finishes creating form and produces body with its length
     pub fn finish(self) -> (u64, Bytes) {
         let mut bytes = self.storage.into_inner();
@@ -78,11 +123,13 @@ impl Form {
 mod tests {
     use ::mime::TEXT_PLAIN;
     use ::std::str;
+    use ::std::fs;
+    use ::std::io::Read;
     use super::Form;
 
     #[test]
     fn multipart_form_add_simple_field() {
-        static EXPECTED: &'static str = "--yuki\r\nContent-Disposition: form-data; name=\"SimpleField\"\r\n\r\nsimple test\r\n--yuki--\r\n";
+        const EXPECTED: &'static str = "--yuki\r\nContent-Disposition: form-data; name=\"SimpleField\"\r\n\r\nsimple test\r\n--yuki--\r\n";
 
         let mut form = Form::new();
         form.add_field("SimpleField".to_string(), "simple test".as_bytes());
@@ -94,8 +141,27 @@ mod tests {
     }
 
     #[test]
+    fn multipart_form_add_file() {
+        const FILE_NAME: &'static str = "Cargo.toml";
+
+        let mut file_body = String::new();
+        let mut file = fs::File::open(FILE_NAME).expect("to open file");
+        file.read_to_string(&mut file_body).expect("Read to string");
+        let expected = format!("--yuki\r\nContent-Disposition: form-data; name=\"Cargo\"; filename=\"Cargo.toml\"\r\nContent-Type: text/x-toml\r\n\r\n{}\r\n--yuki--\r\n", file_body);
+
+        let mut form = Form::new();
+        form.add_file("Cargo".to_string(), FILE_NAME).expect("To read file");
+
+        let (len, body) = form.finish();
+        let str_body = str::from_utf8(&body).expect("To get str slice of body");
+        assert_eq!(len as usize, expected.len());
+        assert_eq!(str_body, expected);
+    }
+
+
+    #[test]
     fn multipart_form_add_multiple_fields() {
-        static EXPECTED: &'static str = "--yuki\r\nContent-Disposition: form-data; name=\"SimpleField\"\r\n\r\nsimple test\r\n--yuki\r\n--yuki\r\nContent-Disposition: form-data; name=\"SimpleFile\"; filename=\"File.txt\"\r\nContent-Type: text/plain\r\n\r\nsimple file\r\n--yuki--\r\n";
+        const EXPECTED: &'static str = "--yuki\r\nContent-Disposition: form-data; name=\"SimpleField\"\r\n\r\nsimple test\r\n--yuki\r\n--yuki\r\nContent-Disposition: form-data; name=\"SimpleFile\"; filename=\"File.txt\"\r\nContent-Type: text/plain\r\n\r\nsimple file\r\n--yuki--\r\n";
 
         let mut form = Form::new();
         form.add_field("SimpleField".to_string(), "simple test".as_bytes());

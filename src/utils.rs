@@ -34,6 +34,18 @@ impl BytesWriter {
     pub fn len(&self) -> usize {
         self.buf.len()
     }
+
+    #[inline]
+    pub fn split_off(&mut self, at: usize) -> Self {
+        Self {
+            buf: self.buf.split_off(at)
+        }
+    }
+
+    #[inline]
+    pub fn reserve(&mut self, add: usize) {
+        self.buf.reserve(add);
+    }
 }
 
 impl io::Write for BytesWriter {
@@ -41,6 +53,12 @@ impl io::Write for BytesWriter {
         self.buf.extend_from_slice(buf);
         Ok(buf.len())
     }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.buf.extend_from_slice(buf);
+        Ok(())
+    }
+
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
