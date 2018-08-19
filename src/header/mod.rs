@@ -6,4 +6,4 @@ mod content_encoding;
 mod content_disposition;
 
 pub use self::content_encoding::ContentEncoding;
-pub use self::content_disposition::ContentDisposition;
+pub use self::content_disposition::{Filename, ContentDisposition};

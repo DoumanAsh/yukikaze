@@ -31,22 +31,22 @@ impl Filename {
     }
 
     ///Creates file name.
-    pub fn with_name(name: &str) -> Self {
-        Filename::Name(Some(name.to_owned()))
+    pub fn with_name(name: String) -> Self {
+        Filename::Name(Some(name))
     }
 
     ///Creates file name, and checks whether it should be encoded.
     ///
     ///Note that actual encoding would happen only when header is written.
     ///The value itself would remain unchanged in the `Filename`.
-    pub fn with_encoded_name(name: &str) -> Self {
-        let bytes = name.as_bytes();
-        let is_ascii = bytes.iter().all(|byte| PATH_SEGMENT_ENCODE_SET.contains(*byte));
+    pub fn with_encoded_name(name: String) -> Self {
+        println!("encoded={}", percent_encode(name.as_bytes(), PATH_SEGMENT_ENCODE_SET));
+        let is_non_ascii = name.as_bytes().iter().any(|byte| PATH_SEGMENT_ENCODE_SET.contains(*byte));
 
-        match is_ascii {
-            true => Self::with_name(name),
-            false => {
-                let bytes = bytes.to_owned();
+        match is_non_ascii {
+            false => Self::with_name(name),
+            true => {
+                let bytes = name.into_bytes();
                 Filename::Extended("utf-8".to_owned(), None, bytes)
             }
         }
@@ -236,9 +236,16 @@ mod tests {
     use super::{ContentDisposition, Filename};
 
     #[test]
-    fn parse_file_name_extended() {
+    fn parse_file_name_extended_ascii() {
+        const INPUT: &'static str = "rori.mp4";
+        let file_name = Filename::with_encoded_name(INPUT.to_string());
+        assert!(!file_name.is_extended());
+    }
+
+    #[test]
+    fn parse_file_name_extended_non_ascii() {
         const INPUT: &'static str = "ロリへんたい.mp4";
-        let file_name = Filename::with_encoded_name(INPUT);
+        let file_name = Filename::with_encoded_name(INPUT.to_string());
         assert!(file_name.is_extended());
     }
 

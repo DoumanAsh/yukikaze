@@ -30,6 +30,7 @@ pub struct Request {
     pub(crate) inner: HyperRequest
 }
 
+pub mod multipart;
 pub mod tags;
 
 impl Request {
@@ -323,6 +324,16 @@ impl Builder {
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();
         Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").body(body))
+    }
+
+    ///Creates request with multipart body.
+    pub fn multipart(self, body: multipart::Form) -> Request {
+        let mut content_type = utils::BytesWriter::with_capacity(30 + body.boundary.len());
+        let _ = write!(&mut content_type, "multipart/form-data; boundary={}", body.boundary);
+        let content_type = unsafe { http::header::HeaderValue::from_shared_unchecked(content_type.freeze()) };
+
+        let (len, body) = body.finish();
+        self.set_header_if_none(header::CONTENT_TYPE, content_type).content_len(len).body(body)
     }
 
     ///Creates request with no body.
