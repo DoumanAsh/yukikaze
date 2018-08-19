@@ -1,4 +1,4 @@
-use ::percent_encoding::{percent_encode, USERINFO_ENCODE_SET, percent_decode};
+use ::percent_encoding::{percent_encode, PATH_SEGMENT_ENCODE_SET, percent_decode, EncodeSet};
 use ::pest::Parser;
 
 use ::std::fmt;
@@ -25,6 +25,38 @@ pub enum Filename {
 }
 
 impl Filename {
+    ///Returns default `Filename` with empty name field.
+    pub fn new() -> Self {
+        Filename::Name(None)
+    }
+
+    ///Creates file name.
+    pub fn with_name(name: &str) -> Self {
+        Filename::Name(Some(name.to_owned()))
+    }
+
+    ///Creates file name, and checks whether it should be encoded.
+    ///
+    ///Note that actual encoding would happen only when header is written.
+    ///The value itself would remain unchanged in the `Filename`.
+    pub fn with_encoded_name(name: &str) -> Self {
+        let bytes = name.as_bytes();
+        let is_ascii = bytes.iter().all(|byte| PATH_SEGMENT_ENCODE_SET.contains(*byte));
+
+        match is_ascii {
+            true => Self::with_name(name),
+            false => {
+                let bytes = bytes.to_owned();
+                Filename::Extended("utf-8".to_owned(), None, bytes)
+            }
+        }
+    }
+
+    ///Creates extended file name.
+    pub fn with_extended(charset: String, lang: Option<String>, name: Vec<u8>) -> Self {
+        Filename::Extended(charset, lang, name)
+    }
+
     #[inline]
     ///Returns whether filename is of extended type.
     pub fn is_extended(&self) -> bool {
@@ -170,7 +202,7 @@ impl fmt::Display for ContentDisposition {
                     write!(f, "attachment; filename*={}'{}'{}",
                            charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, USERINFO_ENCODE_SET).to_string())
+                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET).to_string())
                 },
             },
             ContentDisposition::FormData(None, file) => match file {
@@ -180,7 +212,7 @@ impl fmt::Display for ContentDisposition {
                     write!(f, "form-data; filename*={}'{}'{}",
                            charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, USERINFO_ENCODE_SET).to_string())
+                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET).to_string())
                 },
             },
             ContentDisposition::FormData(Some(name), file) => match file {
@@ -191,7 +223,7 @@ impl fmt::Display for ContentDisposition {
                            name,
                            charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, USERINFO_ENCODE_SET).to_string())
+                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET).to_string())
                 },
             }
         }
@@ -202,6 +234,13 @@ impl fmt::Display for ContentDisposition {
 mod tests {
     use ::percent_encoding::{percent_decode};
     use super::{ContentDisposition, Filename};
+
+    #[test]
+    fn parse_file_name_extended() {
+        const INPUT: &'static str = "ロリへんたい.mp4";
+        let file_name = Filename::with_encoded_name(INPUT);
+        assert!(file_name.is_extended());
+    }
 
     #[test]
     fn parse_inline_disp() {
