@@ -236,7 +236,7 @@ impl Builder {
         self
     }
 
-    ///Adds authentication header.
+    ///Adds basic authentication header.
     pub fn basic_auth<U: fmt::Display, P: fmt::Display>(mut self, username: U, password: Option<P>) -> Self {
         const BASIC: &'static str = "basic ";
 
@@ -250,6 +250,22 @@ impl Builder {
             header_value.put_slice(BASIC.as_bytes());
             BASE64.encode_mut(auth.as_bytes(), &mut header_value.bytes_mut()[..encode_len]);
             header_value.advance_mut(encode_len);
+            http::header::HeaderValue::from_shared_unchecked(header_value.freeze())
+        };
+
+        let _ = self.headers().insert(http::header::AUTHORIZATION, header_value);
+
+        self
+    }
+
+    ///Adds bearer authentication header.
+    pub fn bearer_auth(mut self, token: &str) -> Self {
+        const TYPE: &'static str = "bearer ";
+
+        let header_value = unsafe {
+            let mut header_value = bytes::BytesMut::with_capacity(token.as_bytes().len() + TYPE.as_bytes().len());
+            header_value.put_slice(TYPE.as_bytes());
+            header_value.put_slice(token.as_bytes());
             http::header::HeaderValue::from_shared_unchecked(header_value.freeze())
         };
 

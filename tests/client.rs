@@ -80,8 +80,9 @@ fn make_request_w_limited_body() {
 #[test]
 fn make_request() {
     let request = client::Request::get(BIN_URL).expect("To create get request")
-                                              .basic_auth("Lolka", Some("Pass"))
-                                              .empty();
+                                               .bearer_auth("lolka")
+                                               .basic_auth("Lolka", Some("Pass"))
+                                               .empty();
 
     {
         assert_eq!(request.method(), http::method::Method::GET);
