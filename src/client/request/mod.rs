@@ -259,6 +259,9 @@ impl Builder {
     }
 
     ///Adds bearer authentication header.
+    ///
+    ///Generally tokens are already contain only valud symbols for header.
+    ///So the function doesn't encode it using base64.
     pub fn bearer_auth(mut self, token: &str) -> Self {
         const TYPE: &'static str = "bearer ";
 
