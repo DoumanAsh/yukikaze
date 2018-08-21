@@ -40,7 +40,6 @@ impl Filename {
     ///Note that actual encoding would happen only when header is written.
     ///The value itself would remain unchanged in the `Filename`.
     pub fn with_encoded_name(name: String) -> Self {
-        println!("encoded={}", percent_encode(name.as_bytes(), PATH_SEGMENT_ENCODE_SET));
         let is_non_ascii = name.as_bytes().iter().any(|byte| PATH_SEGMENT_ENCODE_SET.contains(*byte));
 
         match is_non_ascii {
