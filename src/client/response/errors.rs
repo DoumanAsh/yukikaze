@@ -72,3 +72,9 @@ impl ResponseError {
         }
     }
 }
+
+impl From<hyper::error::Error> for ResponseError {
+    fn from(error: hyper::error::Error) -> ResponseError {
+        ResponseError::HyperError(error)
+    }
+}
