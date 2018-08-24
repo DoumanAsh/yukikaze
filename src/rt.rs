@@ -5,7 +5,7 @@
 //!
 //!## Example
 //!
-//!```rust
+//!```rust,no_run
 //!extern crate yukikaze;
 //!use yukikaze::client;
 //!use yukikaze::rt::{AutoClient, AutoRuntime};
