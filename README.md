@@ -40,6 +40,10 @@ fn main() {
 }
 ```
 
+## Examples
+
+- [fie](https://github.com/DoumanAsh/fie) - CLI shit posting tool for various social medias.
+
 ## Q&A
 
 **Q:** Why not just use [reqwest](https://github.com/seanmonstar/reqwest)/[actix-web](https://github.com/actix/actix-web)/[mio_httpc](https://github.com/SergejJurecko/mio_httpc)?
