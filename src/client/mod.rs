@@ -1,4 +1,36 @@
 //!Client module
+//!
+//!Yukikaze-sama's HTTP Client is plain wrapper over hyper's client.
+//!In order to configure it user should use [Config](config/trait.Config.html)
+//!
+//!## Providing configuration
+//!
+//!```rust
+//!extern crate yukikaze;
+//!
+//!use yukikaze::client;
+//!use yukikaze::client::config::{Config, DefaultCfg};
+//!
+//!use std::time::Duration;
+//!
+//!struct Conf;
+//!
+//!impl Config for Conf {
+//!    fn timeout() -> Duration {
+//!        Duration::from_secs(10)
+//!    }
+//!
+//!    fn default_headers(request: &mut client::Request) {
+//!        DefaultCfg::default_headers(request);
+//!        //We can set Yukikaze-sama default headers
+//!        //and our own!
+//!    }
+//!}
+//!
+//!let _client = client::Client::<Conf>::new();
+//!//Use client now
+//!
+//!```
 
 use ::header;
 
