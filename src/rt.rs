@@ -33,11 +33,14 @@ use ::futures::{IntoFuture, Future};
 
 use ::std::cell::Cell;
 use ::std::marker::PhantomData;
+use ::std::sync::atomic::{AtomicBool, Ordering};
 
 use ::client;
 
 thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(None));
-thread_local!(static CLIENT: Cell<Option<Box<client::HttpClient>>> = Cell::new(None));
+
+static GLOBAL_GUARD: AtomicBool = AtomicBool::new(false);
+static mut GLOBAL_CLIENT: Option<Box<client::HttpClient + 'static + Sync>> = None;
 
 ///Guard that controls lifetime of Runtime module
 ///
@@ -83,12 +86,17 @@ pub fn init() -> Guard {
 }
 
 ///Sets global client in thread local storage.
-pub fn set<C: client::HttpClient + 'static>(client: C) {
-    CLIENT.with(move |store| store.set(Some(Box::new(client))))
+pub fn set<C: client::HttpClient + 'static + Sync>(client: C) {
+    match GLOBAL_GUARD.compare_and_swap(false, true, Ordering::SeqCst) {
+        false => unsafe {
+            GLOBAL_CLIENT = Some(Box::new(client));
+        },
+        true => panic!("Settings client twice")
+    }
 }
 
 ///Sets global client using specified config in thread local storage.
-pub fn set_with_config<C: Config + 'static>() {
+pub fn set_with_config<C: Config + Sync + Send + 'static>() {
     let client = client::Client::<C>::new();
     set(client)
 }
@@ -101,14 +109,13 @@ pub fn set_default() {
 
 ///Executes HTTP request on global client
 pub fn execute(req: client::Request) -> client::response::FutureResponse {
-    CLIENT.with(move |store| match store.replace(None) {
-        Some(client) => {
-            let res = client.execute(req);
-            store.set(Some(client));
-            res
-        },
-        None => panic!("Client is not set"),
-    })
+    match GLOBAL_GUARD.load(Ordering::SeqCst) {
+        true => unsafe { match GLOBAL_CLIENT.as_ref() {
+            Some(ref client) => client.execute(req),
+            None => ::std::hint::unreachable_unchecked()
+        }},
+        false => panic!("Client is not set")
+    }
 }
 
 ///Starts function within tokio runtime that returns future
