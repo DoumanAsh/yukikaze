@@ -75,7 +75,9 @@ pub fn init() -> Guard {
         }
     });
 
-    Guard {}
+    Guard {
+        _dummy: PhantomData
+    }
 }
 
 ///Sets global client in thread local storage.
