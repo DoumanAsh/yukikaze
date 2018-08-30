@@ -33,13 +33,20 @@ use ::futures::{IntoFuture, Future};
 
 use ::std::cell::Cell;
 use ::std::marker::PhantomData;
-use ::std::sync::atomic::{AtomicBool, Ordering};
+use ::std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::client;
 
 thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(None));
 
-static GLOBAL_GUARD: AtomicBool = AtomicBool::new(false);
+//Not set yet
+const UNINITIALIZED: usize = 0;
+//Being set
+const INITIALIZING: usize = 1;
+//Set
+const INITIALIZED: usize = 2;
+
+static GLOBAL_GUARD: AtomicUsize = AtomicUsize::new(UNINITIALIZED);
 static mut GLOBAL_CLIENT: Option<Box<client::HttpClient + 'static + Sync>> = None;
 
 ///Guard that controls lifetime of Runtime module
@@ -85,23 +92,36 @@ pub fn init() -> Guard {
     }
 }
 
-///Sets global client in thread local storage.
+///Sets global client.
+///
+///## Panics
+///
+///Settings client more than once.
 pub fn set<C: client::HttpClient + 'static + Sync>(client: C) {
-    match GLOBAL_GUARD.compare_and_swap(false, true, Ordering::SeqCst) {
-        false => unsafe {
+    match GLOBAL_GUARD.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::Release) {
+        UNINITIALIZED => unsafe {
             GLOBAL_CLIENT = Some(Box::new(client));
+            GLOBAL_GUARD.store(INITIALIZED, Ordering::SeqCst);
         },
-        true => panic!("Settings client twice")
+        _ => panic!("Setting client twice")
     }
 }
 
-///Sets global client using specified config in thread local storage.
-pub fn set_with_config<C: Config + Sync + Send + 'static>() {
+///Sets global client using specified config.
+///
+///## Panics
+///
+///Settings client more than once.
+pub fn set_with_config<C: Config + Sync + 'static>() {
     let client = client::Client::<C>::new();
     set(client)
 }
 
-///Sets default client as global in thread local storage.
+///Sets default client as global.
+///
+///## Panics
+///
+///Settings client more than once.
 pub fn set_default() {
     let client = client::Client::default();
     set(client)
@@ -109,12 +129,12 @@ pub fn set_default() {
 
 ///Executes HTTP request on global client
 pub fn execute(req: client::Request) -> client::response::FutureResponse {
-    match GLOBAL_GUARD.load(Ordering::SeqCst) {
-        true => unsafe { match GLOBAL_CLIENT.as_ref() {
+    match GLOBAL_GUARD.load(Ordering::Acquire) {
+        INITIALIZED => unsafe { match GLOBAL_CLIENT.as_ref() {
             Some(ref client) => client.execute(req),
             None => ::std::hint::unreachable_unchecked()
         }},
-        false => panic!("Client is not set")
+        _ => panic!("Client is not set")
     }
 }
 

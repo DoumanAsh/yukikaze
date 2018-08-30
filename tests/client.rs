@@ -54,7 +54,7 @@ fn make_timeout() {
         _ => panic!("Unexpected error")
     };
 
-    let result = rt.block_on(timeout.retry(time::Duration::from_secs(1)));
+    let result = rt.block_on(timeout.retry(time::Duration::from_secs(5)));
     println!("result={:?}", result);
     let result = result.expect("To have successful retry");
     assert!(result.is_success());
