@@ -5,11 +5,15 @@
 //!
 //!## Example
 //!
-//!```rust,no_run
+//!```rust
 //!extern crate yukikaze;
 //!use yukikaze::client;
-//!use yukikaze::rt::{AutoClient, AutoRuntime};
+//!use yukikaze::rt::{AutoClient, AutoRuntime, init};
 //!
+//!let _guard = init();
+//!//Now we can exeute futures using runtime
+//!//When guard goes out of scope though,
+//!//we no longer can use it.
 //!let client = client::Client::default();
 //!//We set global client to be used anywhere
 //!yukikaze::rt::set(client);
@@ -22,37 +26,116 @@
 //!println!("result={:?}", result);
 //!```
 
+use ::client::config::Config;
+
 use ::tokio::runtime::current_thread::{Runtime, Handle};
 use ::futures::{IntoFuture, Future};
 
 use ::std::cell::Cell;
+use ::std::marker::PhantomData;
+use ::std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::client;
 
-thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(Some(Runtime::new().expect("To crate tokio runtime"))));
-thread_local!(static CLIENT: Cell<Option<Box<client::HttpClient>>> = Cell::new(None));
+thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(None));
 
-///Sets global client in thread local storage.
-pub fn set<C: client::HttpClient + 'static>(client: C) {
-    CLIENT.with(move |store| store.set(Some(Box::new(client))))
+//Not set yet
+const UNINITIALIZED: usize = 0;
+//Being set
+const INITIALIZING: usize = 1;
+//Set
+const INITIALIZED: usize = 2;
+
+static GLOBAL_GUARD: AtomicUsize = AtomicUsize::new(UNINITIALIZED);
+static mut GLOBAL_CLIENT: Option<Box<client::HttpClient + 'static + Sync>> = None;
+
+///Guard that controls lifetime of Runtime module
+///
+///Currently runtime uses tokio's current_thread Runtime and therefore it cannot
+///be shared between threads.
+///
+///On drop, it terminates runtime making it impossible to use it any longer.
+pub struct Guard {
+    //workaround for unstable !Send
+    _dummy: PhantomData<*mut u8>
+}
+impl Drop for Guard {
+    fn drop(&mut self) {
+        TOKIO.with(|rt| rt.replace(None));
+    }
 }
 
-///Sets default client as global in thread local storage.
+///Initializes new runtime and returns guard that controls its lifetime.
+///
+///This function must be called prior to any usage of runtime related functionality:
+///
+///- [run](fn.run.html)
+///- [handle](fn.handle.html)
+///- [AutoRuntime](trait.AutoRuntime.html)
+///
+///## Panics
+///
+///If runtime is already initialized.
+pub fn init() -> Guard {
+    TOKIO.with(|rt| match rt.replace(None) {
+        None => {
+            rt.set(Some(Runtime::new().expect("To crate tokio runtime")));
+        },
+        Some(old) => {
+            drop(old);
+            panic!("Double set of runtime!")
+        }
+    });
+
+    Guard {
+        _dummy: PhantomData
+    }
+}
+
+///Sets global client.
+///
+///## Panics
+///
+///Settings client more than once.
+pub fn set<C: client::HttpClient + 'static + Sync>(client: C) {
+    match GLOBAL_GUARD.compare_and_swap(UNINITIALIZED, INITIALIZING, Ordering::Release) {
+        UNINITIALIZED => unsafe {
+            GLOBAL_CLIENT = Some(Box::new(client));
+            GLOBAL_GUARD.store(INITIALIZED, Ordering::SeqCst);
+        },
+        _ => panic!("Setting client twice")
+    }
+}
+
+///Sets global client using specified config.
+///
+///## Panics
+///
+///Settings client more than once.
+pub fn set_with_config<C: Config + Sync + 'static>() {
+    let client = client::Client::<C>::new();
+    set(client)
+}
+
+///Sets default client as global.
+///
+///## Panics
+///
+///Settings client more than once.
 pub fn set_default() {
     let client = client::Client::default();
-    CLIENT.with(move |store| store.set(Some(Box::new(client))))
+    set(client)
 }
 
 ///Executes HTTP request on global client
 pub fn execute(req: client::Request) -> client::response::FutureResponse {
-    CLIENT.with(move |store| match store.replace(None) {
-        Some(client) => {
-            let res = client.execute(req);
-            store.set(Some(client));
-            res
-        },
-        None => panic!("Client is not set"),
-    })
+    match GLOBAL_GUARD.load(Ordering::Acquire) {
+        INITIALIZED => unsafe { match GLOBAL_CLIENT.as_ref() {
+            Some(ref client) => client.execute(req),
+            None => ::std::hint::unreachable_unchecked()
+        }},
+        _ => panic!("Client is not set")
+    }
 }
 
 ///Starts function within tokio runtime that returns future
@@ -79,7 +162,7 @@ pub fn spawn<F: Future<Item=(), Error=()> + 'static>(fut: F) {
             tokio.spawn(fut);
             rt.set(Some(tokio));
         },
-        None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
+        None => panic!("Runtime is not available! Initialize it or do not use it within blocking calls!"),
     });
 }
 
@@ -91,7 +174,7 @@ pub fn handle() -> Handle {
             rt.set(Some(tokio));
             res
         },
-        None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
+        None => panic!("Runtime is not available! Initialize it or do not use it within blocking calls!"),
     })
 }
 
@@ -125,7 +208,7 @@ pub trait AutoRuntime: Future + Sized {
                 rt.set(Some(tokio));
                 res
             },
-            None => panic!("Recursive call to rt is detected! Do not use it within blocking calls!"),
+            None => panic!("Runtime is not available! Initialize it or do not use it within blocking calls!"),
         })
     }
 }

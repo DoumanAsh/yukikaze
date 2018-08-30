@@ -54,7 +54,7 @@ fn make_timeout() {
         _ => panic!("Unexpected error")
     };
 
-    let result = rt.block_on(timeout.retry(time::Duration::from_secs(1)));
+    let result = rt.block_on(timeout.retry(time::Duration::from_secs(5)));
     println!("result={:?}", result);
     let result = result.expect("To have successful retry");
     assert!(result.is_success());
@@ -402,7 +402,9 @@ fn decode_non_utf8() {
 #[cfg(feature = "rt")]
 #[test]
 fn test_global_client() {
-    use yukikaze::rt::{AutoRuntime, AutoClient};
+    use yukikaze::rt::{AutoRuntime, AutoClient, init};
+
+    let _guard = init();
 
     let client = client::Client::<TimeoutCfg>::new();
     yukikaze::rt::set(client);
@@ -412,4 +414,33 @@ fn test_global_client() {
     let result = request.send().finish();
     println!("result={:?}", result);
     assert!(result.is_err());
+}
+
+#[cfg(feature = "rt")]
+#[should_panic]
+#[test]
+fn test_global_client_not_set() {
+    use yukikaze::rt::{AutoRuntime, AutoClient};
+    let client = client::Client::<TimeoutCfg>::new();
+    yukikaze::rt::set(client);
+    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
+
+    let result = request.send().finish();
+    println!("result={:?}", result);
+}
+
+#[cfg(feature = "rt")]
+#[should_panic]
+#[test]
+fn test_global_client_panic_after_guard_drop() {
+    use yukikaze::rt::{AutoRuntime, AutoClient, init};
+
+    let guard = init();
+
+    yukikaze::rt::set_with_config::<TimeoutCfg>();
+    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
+
+    drop(guard);
+    let result = request.send().finish();
+    println!("result={:?}", result);
 }
