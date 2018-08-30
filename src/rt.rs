@@ -26,6 +26,8 @@
 //!println!("result={:?}", result);
 //!```
 
+use ::client::config::Config;
+
 use ::tokio::runtime::current_thread::{Runtime, Handle};
 use ::futures::{IntoFuture, Future};
 
@@ -85,10 +87,16 @@ pub fn set<C: client::HttpClient + 'static>(client: C) {
     CLIENT.with(move |store| store.set(Some(Box::new(client))))
 }
 
+///Sets global client using specified config in thread local storage.
+pub fn set_with_config<C: Config + 'static>() {
+    let client = client::Client::<C>::new();
+    set(client)
+}
+
 ///Sets default client as global in thread local storage.
 pub fn set_default() {
     let client = client::Client::default();
-    CLIENT.with(move |store| store.set(Some(Box::new(client))))
+    set(client)
 }
 
 ///Executes HTTP request on global client

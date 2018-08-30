@@ -437,8 +437,7 @@ fn test_global_client_panic_after_guard_drop() {
 
     let guard = init();
 
-    let client = client::Client::<TimeoutCfg>::new();
-    yukikaze::rt::set(client);
+    yukikaze::rt::set_with_config::<TimeoutCfg>();
     let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
 
     drop(guard);
