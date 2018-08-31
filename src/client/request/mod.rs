@@ -5,6 +5,7 @@ use ::std::io::Write;
 use ::std::fmt;
 use ::std::ops::{Deref, DerefMut};
 
+use ::httpdate;
 use ::etag;
 use ::cookie;
 use ::data_encoding::BASE64;
@@ -165,13 +166,23 @@ impl Builder {
     ///If it is set, then value is appended to existing header as per standard after
     ///semicolon.
     pub fn set_etag<E: tags::EtagMode>(mut self, etag: &etag::EntityTag, _: E) -> Self {
-        let mut buffer = utils::BytesWriter::new();
+        let mut buffer = utils::BytesWriter::with_smol_capacity();
         let _ = match self.headers().remove(E::HEADER_NAME) {
             Some(old) => write!(&mut buffer, "{}, {}", old.to_str().expect("Invalid ETag!"), etag),
             None => write!(&mut buffer, "{}", etag),
         };
 
         let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+        self.headers().insert(E::HEADER_NAME, value);
+        self
+    }
+
+    ///Sets HttpDate value into corresponding header.
+    pub fn set_date<E: tags::DateMode>(mut self, date: &httpdate::HttpDate, _: E) -> Self {
+        let mut buffer = utils::BytesWriter::with_smol_capacity();
+        let _ = write!(&mut buffer, "{}", date);
+        let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+
         self.headers().insert(E::HEADER_NAME, value);
         self
     }
@@ -227,7 +238,7 @@ impl Builder {
     ///
     ///Replaces previous value, if any.
     pub fn content_disposition(mut self, disp: &header::ContentDisposition) -> Self {
-        let mut buffer = utils::BytesWriter::new();
+        let mut buffer = utils::BytesWriter::with_smol_capacity();
 
         let _ = write!(&mut buffer, "{}", disp);
         let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
@@ -287,7 +298,7 @@ impl Builder {
         let mut uri_parts = self.parts.uri.into_parts();
         let path = uri_parts.path_and_query;
 
-        let mut buffer = utils::BytesWriter::new();
+        let mut buffer = utils::BytesWriter::with_smol_capacity();
         let query = serde_urlencoded::to_string(&query).expect("To url-encode");
 
         let _ = match path {
@@ -325,16 +336,15 @@ impl Builder {
             let _ = self.headers().insert(http::header::COOKIE, cookie);
         }
 
-        let inner = HyperRequest::from_parts(self.parts, body.into());
         Request {
-            inner
+            inner: HyperRequest::from_parts(self.parts, body.into())
         }
     }
 
     ///Creates request with Form payload.
     pub fn form<F: Serialize>(self, body: &F) -> Result<Request, serde_urlencoded::ser::Error> {
         let body = serde_urlencoded::to_string(&body)?;
-        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(body))
+        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").content_len(body.len() as u64).body(body))
     }
 
     ///Creates request with JSON payload.
@@ -342,7 +352,7 @@ impl Builder {
         let mut buffer = utils::BytesWriter::new();
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();
-        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").body(body))
+        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").content_len(body.len() as u64).body(body))
     }
 
     ///Creates request with multipart body.

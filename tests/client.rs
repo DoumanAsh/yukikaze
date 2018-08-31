@@ -393,6 +393,7 @@ fn decode_non_utf8() {
     //Pretend that it acctually sets Content-Type correctly
     response.headers_mut().insert(header::CONTENT_TYPE, header::HeaderValue::from_static("text/html; charset=shift_jis"));
     println!("response={:?}", response);
+    let _last_modified = response.last_modified().expect("To get last_modified");
     let text = response.text();
     let result = rt.block_on(text);
     let res = result.expect("Error with decoding text!");

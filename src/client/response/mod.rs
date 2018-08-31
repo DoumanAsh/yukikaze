@@ -2,6 +2,7 @@
 
 use ::std::fs;
 use ::std::time;
+use ::std::str::FromStr;
 use ::std::ops::{Deref, DerefMut};
 
 use ::header;
@@ -16,6 +17,7 @@ use ::hyper;
 use ::futures;
 use ::futures::Future;
 use ::serde::de::DeserializeOwned;
+use ::httpdate;
 
 type HyperResponse = hyper::Response<hyper::Body>;
 
@@ -168,6 +170,14 @@ impl Response {
         }
 
         Ok(cookies)
+    }
+
+    #[inline]
+    ///Extracts `Last-Modified` date, if valid one is present.
+    pub fn last_modified(&self) -> Option<httpdate::HttpDate> {
+        self.inner.headers().get(header::LAST_MODIFIED)
+                            .and_then(|header| header.to_str().ok())
+                            .and_then(|header| httpdate::HttpDate::from_str(header.trim()).ok())
     }
 
     #[inline]

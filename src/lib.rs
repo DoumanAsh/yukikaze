@@ -53,6 +53,7 @@ pub extern crate serde_urlencoded;
 pub extern crate cookie;
 pub extern crate percent_encoding;
 pub extern crate http;
+pub extern crate httpdate;
 pub extern crate mime;
 extern crate mime_guess;
 pub extern crate etag;

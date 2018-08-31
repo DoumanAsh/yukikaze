@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and cute HTTP client library."
 readme = "README.md"
@@ -24,6 +24,7 @@ hyper-rustls = "0.14"
 tokio = "0.1"
 bytes = "0.4"
 futures = "0.1"
+httpdate = "^0.3.2"
 
 http = "0.1"
 cookie = "0.11"
