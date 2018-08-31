@@ -31,13 +31,13 @@ pub trait DateMode {
 ///Sets HttpDate into `If-Modified-Since` header.
 pub struct IfModifiedSince;
 
-impl EtagMode for IfModifiedSince {
+impl DateMode for IfModifiedSince {
     const HEADER_NAME: header::HeaderName = header::IF_MODIFIED_SINCE;
 }
 
 ///Sets HttpDate into `If-Unmodified-Since` header.
 pub struct IfUnmodifiedSince;
 
-impl EtagMode for IfUnmodifiedSince {
+impl DateMode for IfUnmodifiedSince {
     const HEADER_NAME: header::HeaderName = header::IF_UNMODIFIED_SINCE;
 }
