@@ -71,7 +71,7 @@ pub enum BodyReadError {
     DeflateError(io::Error),
     ///Error happened during gzip decompression.
     GzipError(io::Error),
-    ///Error happenend when writing to file.
+    ///Error happened when writing to file.
     FileError(fs::File, io::Error),
 }
 
@@ -372,7 +372,7 @@ impl Future for Text {
     }
 }
 
-///Reads raw bytes from HTTP Response and deserializes as JSON struct
+///Reads raw bytes from HTTP Response and de-serializes as JSON struct
 pub enum Json<J> {
     #[doc(hidden)]
     Init(Option<RawBody>),

@@ -6,7 +6,7 @@ use ::hyper;
 
 use super::FutureResponse;
 
-///Describes erorrs related to content type
+///Describes errors related to content type.
 #[derive(Debug)]
 pub enum ContentTypeError {
     ///Mime parsing error.
@@ -60,7 +60,7 @@ pub enum ResponseError {
 }
 
 impl ResponseError {
-    ///Attemps to retry, if it is possible.
+    ///Attempts to retry, if it is possible.
     ///
     ///Currently retry can be made only for timed out request or when
     ///timer error happened.

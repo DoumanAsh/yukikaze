@@ -1,5 +1,6 @@
 //!Response primitives.
 
+use ::std::hint;
 use ::std::fs;
 use ::std::time;
 use ::std::str::FromStr;
@@ -50,7 +51,7 @@ impl Response {
     }
 
     #[inline]
-    ///Returns whether Response's status is redirectional.
+    ///Returns whether Response's status is re-directional.
     ///
     ///The response status code is in range 300 to 399
     pub fn is_redirect(&self) -> bool {
@@ -58,7 +59,7 @@ impl Response {
     }
 
     #[inline]
-    ///Returns whether Response's status is error..
+    ///Returns whether Response's status is error.
     ///
     ///The response status code is in range 400 to 599
     pub fn is_error(&self) -> bool {
@@ -248,6 +249,12 @@ impl DerefMut for Response {
 #[must_use = "Future must be polled to actually get HTTP response"]
 ///Ongoing HTTP request.
 pub struct FutureResponse {
+    //We use Option here to
+    //allow future to be moved into Timeout error
+    //
+    //Due to that all branches that handle None
+    //is unreachable.
+    //It should remain impossible for them to be reachable.
     inner: Option<hyper::client::ResponseFuture>,
     delay: tokio::timer::Delay,
 }
@@ -265,7 +272,9 @@ impl FutureResponse {
     fn into_timeout(&mut self) -> errors::Timeout {
         match self.inner.take() {
             Some(inner) => inner.into(),
-            None => unreachable!()
+            None => unsafe {
+                hint::unreachable_unchecked();
+            }
         }
     }
 }
@@ -282,7 +291,9 @@ impl Future for FutureResponse {
                 Err(error) => return Err(errors::ResponseError::HyperError(error))
             }
         } else {
-            unreachable!();
+            unsafe {
+                hint::unreachable_unchecked();
+            }
         }
 
         match self.delay.poll() {

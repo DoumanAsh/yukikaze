@@ -92,7 +92,7 @@ impl DerefMut for Request {
 ///Http request builder.
 ///
 ///Each method that may cause troubles shall
-///panic
+///panic.
 pub struct Builder {
     parts: http::request::Parts,
     cookies: Option<cookie::CookieJar>,
@@ -271,7 +271,7 @@ impl Builder {
 
     ///Adds bearer authentication header.
     ///
-    ///Generally tokens are already contain only valud symbols for header.
+    ///Generally tokens already contain only valid symbols for header.
     ///So the function doesn't encode it using base64.
     pub fn bearer_auth(mut self, token: &str) -> Self {
         const TYPE: &'static str = "bearer ";
