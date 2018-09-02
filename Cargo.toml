@@ -2,7 +2,7 @@
 name = "yukikaze"
 version = "0.2.2"
 authors = ["Douman <douman@gmx.se>"]
-description = "Beautiful and cute HTTP client library."
+description = "Beautiful and elegant HTTP client library."
 readme = "README.md"
 repository = "https://gitlab.com/Douman/yukikaze"
 license = "Apache-2.0"
