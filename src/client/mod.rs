@@ -37,6 +37,7 @@ use ::header;
 use ::hyper;
 use ::hyper_rustls;
 
+use std::fmt;
 use std::marker::PhantomData;
 
 type HyperClient = hyper::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
@@ -63,6 +64,12 @@ impl Default for Client {
     ///Creates Client with default configuration.
     fn default() -> Self {
         Client::<config::DefaultCfg>::new()
+    }
+}
+
+impl<C: config::Config> fmt::Debug for Client<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Yukikaze {{ HyperClient={:?} }}", self.inner)
     }
 }
 
