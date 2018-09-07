@@ -1,4 +1,5 @@
 use ::std::time;
+use ::std::fmt;
 
 use ::tokio;
 use ::mime;
@@ -13,6 +14,15 @@ pub enum ContentTypeError {
     Mime(mime::FromStrError),
     ///Unknown encoding of Content-Type.
     UnknownEncoding,
+}
+
+impl fmt::Display for ContentTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &ContentTypeError::Mime(ref error) => write!(f, "Failed to parse Mime: {}", error),
+            &ContentTypeError::UnknownEncoding => write!(f, "Unable to recognize encoding")
+        }
+    }
 }
 
 impl From<mime::FromStrError> for ContentTypeError {
@@ -78,3 +88,14 @@ impl From<hyper::error::Error> for ResponseError {
         ResponseError::HyperError(error)
     }
 }
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &ResponseError::Timeout(_) => write!(f, "Request timed out."),
+            &ResponseError::Timer(ref error, _) => write!(f, "IO timer error happened while executing request: {}", error),
+            &ResponseError::HyperError(ref error) => write!(f, "Request failed due to HTTP error: {}", error)
+        }
+    }
+}
+
