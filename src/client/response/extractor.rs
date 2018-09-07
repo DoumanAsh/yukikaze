@@ -5,6 +5,7 @@ use ::std::io;
 use ::std::io::Write;
 use ::std::string;
 use ::std::mem;
+use ::std::fmt;
 
 use ::header;
 use ::utils;
@@ -93,6 +94,20 @@ impl From<hyper::Error> for BodyReadError {
     #[inline]
     fn from(err: hyper::Error) -> Self {
         BodyReadError::Hyper(err)
+    }
+}
+
+impl fmt::Display for BodyReadError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &BodyReadError::Hyper(ref error) => write!(f, "Failed to read due to HTTP error: {}", error),
+            &BodyReadError::Overflow => write!(f, "Read limit is reached. Aborted reading."),
+            &BodyReadError::EncodingError => write!(f, "Unable to decode content into UTF-8"),
+            &BodyReadError::JsonError(ref error) => write!(f, "Failed to extract JSON. Error: {}", error),
+            &BodyReadError::DeflateError(ref error) => write!(f, "Failed to decompress content. Error: {}", error),
+            &BodyReadError::GzipError(ref error) => write!(f, "Failed to decompress content. Error: {}", error),
+            &BodyReadError::FileError(_, ref error) => write!(f, "Error file writing response into file. Error: {}", error),
+        }
     }
 }
 
