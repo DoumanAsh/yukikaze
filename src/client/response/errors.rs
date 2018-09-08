@@ -1,9 +1,13 @@
 use ::std::time;
 use ::std::fmt;
+use ::std::fs;
+use ::std::io;
+use ::std::string;
 
 use ::tokio;
 use ::mime;
 use ::hyper;
+use ::serde_json;
 
 use super::FutureResponse;
 
@@ -99,3 +103,56 @@ impl fmt::Display for ResponseError {
     }
 }
 
+#[derive(Debug)]
+///Describes possible errors when reading body.
+pub enum BodyReadError {
+    ///Hyper's error.
+    Hyper(hyper::Error),
+    ///Hit limit
+    Overflow,
+    ///Unable to decode body as UTF-8
+    EncodingError,
+    ///Json serialization error.
+    JsonError(serde_json::error::Error),
+    ///Error happened during deflate decompression.
+    DeflateError(io::Error),
+    ///Error happened during gzip decompression.
+    GzipError(io::Error),
+    ///Error happened when writing to file.
+    FileError(fs::File, io::Error),
+}
+
+impl From<serde_json::error::Error> for BodyReadError {
+    #[inline]
+    fn from(error: serde_json::error::Error) -> Self {
+        BodyReadError::JsonError(error)
+    }
+}
+
+impl From<string::FromUtf8Error> for BodyReadError {
+    #[inline]
+    fn from(_: string::FromUtf8Error) -> Self {
+        BodyReadError::EncodingError
+    }
+}
+
+impl From<hyper::Error> for BodyReadError {
+    #[inline]
+    fn from(err: hyper::Error) -> Self {
+        BodyReadError::Hyper(err)
+    }
+}
+
+impl fmt::Display for BodyReadError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &BodyReadError::Hyper(ref error) => write!(f, "Failed to read due to HTTP error: {}", error),
+            &BodyReadError::Overflow => write!(f, "Read limit is reached. Aborted reading."),
+            &BodyReadError::EncodingError => write!(f, "Unable to decode content into UTF-8"),
+            &BodyReadError::JsonError(ref error) => write!(f, "Failed to extract JSON. Error: {}", error),
+            &BodyReadError::DeflateError(ref error) => write!(f, "Failed to decompress content. Error: {}", error),
+            &BodyReadError::GzipError(ref error) => write!(f, "Failed to decompress content. Error: {}", error),
+            &BodyReadError::FileError(_, ref error) => write!(f, "Error file writing response into file. Error: {}", error),
+        }
+    }
+}
