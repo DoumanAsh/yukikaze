@@ -191,20 +191,20 @@ impl Response {
 
     #[inline]
     ///Extracts body as raw bytes.
-    pub fn body(self) -> extractor::RawBody {
-        extractor::RawBody::new(self)
+    pub fn body(self) -> extractor::RawBody<extractor::notify::Noop> {
+        extractor::RawBody::new(self, extractor::notify::Noop)
     }
 
     #[inline]
     ///Extracts body as UTF-8 String
-    pub fn text(self) -> extractor::Text {
-        extractor::Text::new(self)
+    pub fn text(self) -> extractor::Text<extractor::notify::Noop> {
+        extractor::Text::new(self, extractor::notify::Noop)
     }
 
     #[inline]
     ///Extracts body as JSON
-    pub fn json<J: DeserializeOwned>(self) -> extractor::Json<J> {
-        extractor::Json::new(self)
+    pub fn json<J: DeserializeOwned>(self) -> extractor::Json<J, extractor::notify::Noop> {
+        extractor::Json::new(self, extractor::notify::Noop)
     }
 
     #[inline]
@@ -213,14 +213,14 @@ impl Response {
     ///# Panics
     ///
     ///- If file is read-only. Checked only when debug assertions are on.
-    pub fn file(self, file: fs::File) -> extractor::FileBody {
+    pub fn file(self, file: fs::File) -> extractor::FileBody<extractor::notify::Noop> {
         #[cfg(debug_assertions)]
         {
             let meta = file.metadata().expect("To be able to get metadata");
             debug_assert!(!meta.permissions().readonly(), "File is read-only");
         }
 
-        extractor::FileBody::new(self, file)
+        extractor::FileBody::new(self, file, extractor::notify::Noop)
     }
 }
 

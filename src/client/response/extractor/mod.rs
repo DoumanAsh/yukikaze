@@ -4,6 +4,7 @@ use ::std::fs;
 use ::std::io;
 use ::std::io::Write;
 use ::std::mem;
+use ::std::marker::PhantomData;
 
 use ::header;
 use ::utils;
@@ -28,6 +29,9 @@ use ::cookie;
 const BUFFER_SIZE: usize = 4096;
 //The default limit on body size 2mb.
 const DEFEAULT_LIMIT: u64 = 2 * 1024 * 1024;
+
+pub mod notify;
+pub use self::notify::Notifier;
 
 ///Cookie extractor.
 ///
@@ -56,9 +60,11 @@ impl<'a> Iterator for CookieIter<'a> {
     }
 }
 
-enum BodyType {
+pub(crate) enum BodyType {
     Plain(hyper::Body, bytes::BytesMut),
+    #[cfg(feature = "flate2")]
     Deflate(hyper::Body, flate2::write::ZlibDecoder<utils::BytesWriter>),
+    #[cfg(feature = "flate2")]
     Gzip(hyper::Body, flate2::write::GzDecoder<utils::BytesWriter>),
 }
 
@@ -71,15 +77,16 @@ enum BodyType {
 ///
 ///Note that `ContentEncoding::Deflate` supports zlib encoded data with deflate compression.
 ///Plain deflate is non-conforming and not supported.
-pub struct RawBody {
+pub struct RawBody<N> {
     parts: http::response::Parts,
     body: BodyType,
     limit: u64,
+    notifier: N,
 }
 
-impl RawBody {
+impl<N: Notifier> RawBody<N> {
     ///Creates new instance.
-    pub fn new(response: super::Response) -> Self {
+    pub fn new(response: super::Response, notifier: N) -> Self {
         let encoding = response.content_encoding();
         let buffer_size = match response.content_len() {
             Some(len) => len as usize,
@@ -101,6 +108,7 @@ impl RawBody {
             parts,
             body,
             limit: DEFEAULT_LIMIT,
+            notifier
         }
     }
 
@@ -170,15 +178,26 @@ impl RawBody {
         self.limit = limit;
         self
     }
+
+    #[inline]
+    ///Transforms self into future with new [Notifier](notify/trait.Notifier.html)
+    pub fn with_notify<T: notify::Notifier>(self, notifier: T) -> RawBody<T> {
+        RawBody::<T> {
+            parts: self.parts,
+            body: self.body,
+            limit: self.limit,
+            notifier,
+        }
+    }
 }
 
-impl Future for RawBody {
+impl<N: Notifier> Future for RawBody<N> {
     type Item = bytes::Bytes;
     type Error = BodyReadError;
 
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
         loop {
-            match self.body {
+            let bytes = match self.body {
                 BodyType::Plain(ref mut body, ref mut buffer) => match body.poll() {
                     Ok(futures::Async::Ready(Some(chunk))) => {
                         if self.limit < (buffer.len() + chunk.len()) as u64 {
@@ -187,6 +206,7 @@ impl Future for RawBody {
 
                         buffer.extend_from_slice(&chunk);
                         //We loop, to schedule more IO
+                        chunk.len()
                     },
                     Ok(futures::Async::Ready(None)) => {
                         let buffer = mem::replace(buffer, bytes::BytesMut::new());
@@ -205,6 +225,7 @@ impl Future for RawBody {
                             return Err(BodyReadError::Overflow);
                         }
                         //We loop, to schedule more IO
+                        chunk.len()
                     },
                     Ok(futures::Async::Ready(None)) => {
                         decoder.try_finish().map_err(|error| BodyReadError::DeflateError(error))?;
@@ -225,6 +246,7 @@ impl Future for RawBody {
                             return Err(BodyReadError::Overflow);
                         }
                         //We loop, to schedule more IO
+                        chunk.len()
                     },
                     Ok(futures::Async::Ready(None)) => {
                         decoder.try_finish().map_err(|error| BodyReadError::GzipError(error))?;
@@ -235,7 +257,9 @@ impl Future for RawBody {
                     Err(error) => return Err(error.into())
 
                 },
-            }
+            };
+
+            self.notifier.send(bytes);
         }
     }
 }
@@ -246,21 +270,21 @@ impl Future for RawBody {
 ///
 ///If `Content-Encoding` contains charset information it
 ///shall be automatically applied when decoding data.
-pub enum Text {
+pub enum Text<N> {
     #[doc(hidden)]
-    Init(Option<RawBody>),
+    Init(Option<RawBody<N>>),
     #[cfg(feature = "encoding")]
     #[doc(hidden)]
-    Future(RawBody, Option<encoding::EncodingRef>),
+    Future(RawBody<N>, Option<encoding::EncodingRef>),
     #[cfg(not(feature = "encoding"))]
     #[doc(hidden)]
-    Future(RawBody),
+    Future(RawBody<N>),
 }
 
-impl Text {
+impl<N: Notifier> Text<N> {
     ///Creates new instance.
-    pub fn new(response: super::Response) -> Self {
-        Text::Init(Some(RawBody::new(response)))
+    pub fn new(response: super::Response, notifier: N) -> Self {
+        Text::Init(Some(RawBody::new(response, notifier)))
     }
 
     #[inline]
@@ -285,9 +309,18 @@ impl Text {
             _ => self
         }
     }
+
+    #[inline]
+    ///Transforms self into future with new [Notifier](notify/trait.Notifier.html)
+    pub fn with_notify<T: notify::Notifier>(self, notifier: T) -> Text<T> {
+        match self {
+            Text::Init(body) => Text::Init(body.map(|body| body.with_notify(notifier))),
+            _ => unreachable!(),
+        }
+    }
 }
 
-impl Future for Text {
+impl<N: Notifier> Future for Text<N> {
     type Item = String;
     type Error = BodyReadError;
 
@@ -306,6 +339,15 @@ impl Future for Text {
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
                     Err(error) => return Err(error)
                 },
+                //No Encoding
+                #[cfg(not(feature = "encoding"))]
+                Text::Future(fut) => match fut.poll() {
+                    Ok(futures::Async::Ready(bytes)) => return String::from_utf8(bytes.to_vec()).map_err(|error| error.into())
+                                                                                                .map(|st| futures::Async::Ready(st)),
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error)
+                },
+                //Encoding
                 #[cfg(feature = "encoding")]
                 Text::Init(raw) => {
                     let raw = raw.take().expect("To have body");
@@ -318,13 +360,6 @@ impl Future for Text {
                 //No Encoding
                 #[cfg(not(feature = "encoding"))]
                 Text::Init(raw) => Text::Future(raw.take().expect("To have body")),
-                #[cfg(not(feature = "encoding"))]
-                Text::Future(fut) => match fut.poll() {
-                    Ok(futures::Async::Ready(bytes)) => return String::from_utf8(bytes.to_vec()).map_err(|error| error.into())
-                                                                                                .map(|st| futures::Async::Ready(st)),
-                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
-                    Err(error) => return Err(error)
-                }
             };
 
             *self = new_state;
@@ -333,17 +368,21 @@ impl Future for Text {
 }
 
 ///Reads raw bytes from HTTP Response and de-serializes as JSON struct
-pub enum Json<J> {
+pub enum Json<J, N> where N: Notifier {
     #[doc(hidden)]
-    Init(Option<RawBody>),
+    Init(Option<RawBody<N>>),
+    #[cfg(feature = "encoding")]
     #[doc(hidden)]
-    Future(futures::AndThen<RawBody, Result<J, BodyReadError>, fn(bytes::Bytes) -> Result<J, BodyReadError>>)
+    Future(RawBody<N>, Option<encoding::EncodingRef>, PhantomData<J>),
+    #[cfg(not(feature = "encoding"))]
+    #[doc(hidden)]
+    Future(RawBody<N>, PhantomData<J>),
 }
 
-impl<J: DeserializeOwned> Json<J> {
+impl<J: DeserializeOwned, N: Notifier> Json<J, N> {
     ///Creates new instance.
-    pub fn new(response: super::Response) -> Self {
-        Json::Init(Some(RawBody::new(response)))
+    pub fn new(response: super::Response, notifier: N) -> Self {
+        Json::Init(Some(RawBody::new(response, notifier)))
     }
 
     #[inline]
@@ -367,20 +406,58 @@ impl<J: DeserializeOwned> Json<J> {
         }
     }
 
-    fn encode(bytes: bytes::Bytes) -> Result<J, BodyReadError> {
-        serde_json::from_slice(&bytes).map_err(BodyReadError::from)
+    #[inline]
+    ///Transforms self into future with new [Notifier](notify/trait.Notifier.html)
+    pub fn with_notify<T: notify::Notifier>(self, notifier: T) -> Text<T> {
+        match self {
+            Json::Init(body) => Text::Init(body.map(|body| body.with_notify(notifier))),
+            _ => unreachable!()
+        }
     }
 }
 
-impl<J: DeserializeOwned> Future for Json<J> {
+impl<J: DeserializeOwned, N: Notifier> Future for Json<J, N> {
     type Item = J;
     type Error = BodyReadError;
 
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
         loop {
             let new_state = match self {
-                Json::Future(fut) => return fut.poll(),
-                Json::Init(raw) => Json::Future(raw.take().expect("To have body").and_then(Self::encode))
+                //Encoding
+                #[cfg(feature = "encoding")]
+                Json::Future(fut, enc, _) => match fut.poll() {
+                    Ok(futures::Async::Ready(bytes)) => return match enc {
+                        Some(enc) => enc.decode(&bytes, encoding::types::DecoderTrap::Strict)
+                                        .map_err(|_| BodyReadError::EncodingError)
+                                        .and_then(|decoded| serde_json::from_str(&decoded).map_err(BodyReadError::from))
+                                        .map(|st| futures::Async::Ready(st)),
+                        None => return serde_json::from_slice(&bytes).map_err(BodyReadError::from)
+                                                                     .map(|st| futures::Async::Ready(st)),
+                    },
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error)
+                },
+                //No Encoding
+                #[cfg(not(feature = "encoding"))]
+                Json::Future(fut, _) => match fut.poll() {
+                    Ok(futures::Async::Ready(bytes)) => return serde_json::from_slice(&bytes).map_err(BodyReadError::from)
+                                                                                             .map(|st| futures::Async::Ready(st)),
+                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
+                    Err(error) => return Err(error)
+                },
+                //Encoding
+                #[cfg(feature = "encoding")]
+                Json::Init(raw) => {
+                    let raw = raw.take().expect("To have body");
+                    let encoding = raw.charset_encoding().ok().and_then(|enc| match enc.name() {
+                        "utf-8" => None,
+                        _ => Some(enc)
+                    });
+                    Json::Future(raw, encoding, PhantomData)
+                },
+                //No Encoding
+                #[cfg(not(feature = "encoding"))]
+                Json::Init(raw) => Json::Future(raw.take().expect("To have body"), PhantomData),
             };
 
             *self = new_state;
@@ -395,14 +472,15 @@ enum FileBodyType {
 }
 
 ///Redirects body to file.
-pub struct FileBody {
+pub struct FileBody<N> {
     parts: http::response::Parts,
     body: FileBodyType,
+    notifier: N,
 }
 
-impl FileBody {
+impl<N: Notifier> FileBody<N> {
     ///Creates new instance.
-    pub fn new(response: super::Response, file: fs::File) -> Self {
+    pub fn new(response: super::Response, file: fs::File, notifier: N) -> Self {
         let encoding = response.content_encoding();
         let (parts, body) = response.inner.into_parts();
         let file = io::BufWriter::new(file);
@@ -418,6 +496,7 @@ impl FileBody {
         Self {
             parts,
             body,
+            notifier
         }
     }
 
@@ -439,15 +518,25 @@ impl FileBody {
             .and_then(|header| header.to_str().ok())
             .and_then(|header| header.parse().ok())
     }
+
+    #[inline]
+    ///Transforms self into future with new [Notifier](notify/trait.Notifier.html)
+    pub fn with_notify<T: notify::Notifier>(self, notifier: T) -> FileBody<T> {
+        FileBody::<T> {
+            parts: self.parts,
+            body: self.body,
+            notifier,
+        }
+    }
 }
 
-impl Future for FileBody {
+impl<N: Notifier> Future for FileBody<N> {
     type Item = fs::File;
     type Error = BodyReadError;
 
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
         loop {
-            match self.body {
+            let bytes = match self.body {
                 FileBodyType::Plain(ref mut body, ref mut buffer) => match body.poll() {
                     Ok(futures::Async::Ready(Some(chunk))) => {
                         buffer.as_mut().unwrap().write_all(&chunk).map_err(|error| {
@@ -456,6 +545,7 @@ impl Future for FileBody {
                             BodyReadError::FileError(file.into_inner().expect("To get File"), error)
                         })?;
                         //We loop, to schedule more IO
+                        chunk.len()
                     },
                     Ok(futures::Async::Ready(None)) => {
                         let file = buffer.take().unwrap();
@@ -473,6 +563,7 @@ impl Future for FileBody {
                     Ok(futures::Async::Ready(Some(chunk))) => {
                         decoder.as_mut().unwrap().write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
                         //We loop, to schedule more IO
+                        chunk.len()
                     },
                     Ok(futures::Async::Ready(None)) => {
                         let mut decoder = decoder.take().unwrap();
@@ -494,6 +585,7 @@ impl Future for FileBody {
                     Ok(futures::Async::Ready(Some(chunk))) => {
                         decoder.as_mut().unwrap().write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
                         //We loop, to schedule more IO
+                        chunk.len()
                     },
                     Ok(futures::Async::Ready(None)) => {
                         let mut decoder = decoder.take().unwrap();
@@ -511,7 +603,9 @@ impl Future for FileBody {
                     Err(error) => return Err(error.into())
 
                 },
-            }
+            };
+
+            self.notifier.send(bytes);
         }
     }
 }
