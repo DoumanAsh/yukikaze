@@ -223,6 +223,41 @@ fn make_request_w_gzip_body_stored_as_file() {
     let _ = fs::remove_file("gzip.json");
 }
 
+#[test]
+fn make_request_w_gzip_body_stored_as_file_with_notify() {
+    use std::sync::mpsc::channel;
+
+    let request = client::request::Request::get(BIN_GZIP).expect("To create get request")
+                                                         .accept_encoding(yukikaze::header::ContentEncoding::Gzip)
+                                                         .empty();
+
+    let mut rt = get_tokio_rt();
+
+    let client = client::Client::default();
+
+    let result = rt.block_on(client.execute(request));
+    let result = result.expect("To get");
+    assert!(result.is_success());
+
+    let (sender, receiver) = channel();
+
+    let file = fs::OpenOptions::new().truncate(true).read(true).write(true).create(true).open("gzip2.json").expect("To create file");
+    let body = result.file(file).with_notify(sender);
+    let result = rt.block_on(body);
+
+    for bytes in receiver {
+        assert!(bytes != 0);
+    }
+
+    let mut file = result.expect("Get File");
+    file.seek(io::SeekFrom::Start(0)).expect("Move to the beggining of file");
+    let result: BinGzippedRsp = serde_json::from_reader(file).expect("To get gzip.json");
+    assert!(result.gzipped);
+    assert_eq!(result.method, "GET");
+
+    let _ = fs::remove_file("gzip2.json");
+}
+
 
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
 struct HttpBinJson {
