@@ -6,6 +6,24 @@ use ::std::io;
 const DEFAULT_CAPACITY: usize = 4096;
 const SMOL_CAPCITY: usize = 64;
 
+#[macro_export]
+#[cfg(not(debug_assertions))]
+macro_rules! unreach {
+    () => ({
+        unsafe {
+            ::std::hint::unreachable_unchecked();
+        }
+    })
+}
+
+#[macro_export]
+#[cfg(debug_assertions)]
+macro_rules! unreach {
+    () => ({
+        unreachable!()
+    })
+}
+
 pub(crate) struct BytesWriter {
     buf: bytes::BytesMut,
 }

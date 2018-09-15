@@ -1,6 +1,5 @@
 //!Response primitives.
 
-use ::std::hint;
 use ::std::fs;
 use ::std::time;
 use ::std::str::FromStr;
@@ -272,9 +271,7 @@ impl FutureResponse {
     fn into_timeout(&mut self) -> errors::Timeout {
         match self.inner.take() {
             Some(inner) => inner.into(),
-            None => unsafe {
-                hint::unreachable_unchecked();
-            }
+            None => unreach!()
         }
     }
 }
@@ -284,16 +281,13 @@ impl Future for FutureResponse {
     type Error = errors::ResponseError;
 
     fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
-        if let Some(inner) = self.inner.as_mut() {
-            match inner.poll() {
+        match self.inner.as_mut() {
+            Some(inner) => match inner.poll() {
                 Ok(futures::Async::Ready(result)) => return Ok(futures::Async::Ready(result.into())),
                 Ok(futures::Async::NotReady) => (),
                 Err(error) => return Err(errors::ResponseError::HyperError(error))
-            }
-        } else {
-            unsafe {
-                hint::unreachable_unchecked();
-            }
+            },
+            None => unreach!()
         }
 
         match self.delay.poll() {
