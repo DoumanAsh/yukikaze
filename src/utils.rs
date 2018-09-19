@@ -6,6 +6,7 @@ use ::std::io;
 const DEFAULT_CAPACITY: usize = 4096;
 const SMOL_CAPCITY: usize = 64;
 
+#[doc(hidden)]
 #[macro_export]
 #[cfg(not(debug_assertions))]
 macro_rules! unreach {
@@ -16,6 +17,7 @@ macro_rules! unreach {
     })
 }
 
+#[doc(hidden)]
 #[macro_export]
 #[cfg(debug_assertions)]
 macro_rules! unreach {

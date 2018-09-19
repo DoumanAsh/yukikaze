@@ -24,6 +24,9 @@ const BIN_JSON: &'static str = "http://httpbin.org/json";
 const BIN_BASIC_AUTH: &'static str = "http://httpbin.org/basic-auth";
 const BIN_ETAG: &'static str = "http://httpbin.org/etag";
 const BIN_COOKIE: &'static str = "http://httpbin.org/cookies";
+const BIN_ABS_REDIRECT_2: &'static str = "http://httpbin.org/absolute-redirect/2";
+const BIN_REL_REDIRECT_2: &'static str = "http://httpbin.org/redirect/2";
+const BIN_ABS_REDIRECT_3: &'static str = "http://httpbin.org/absolute-redirect/3";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -34,6 +37,14 @@ pub struct TimeoutCfg;
 impl client::config::Config for TimeoutCfg {
     fn timeout() -> time::Duration {
         time::Duration::from_millis(50)
+    }
+}
+
+pub struct SmolRedirect;
+
+impl client::config::Config for SmolRedirect {
+    fn max_redirect_num() -> usize {
+        3
     }
 }
 
@@ -54,7 +65,7 @@ fn make_timeout() {
         _ => panic!("Unexpected error")
     };
 
-    let result = rt.block_on(timeout.retry(time::Duration::from_secs(5)));
+    let result = rt.block_on(timeout.retry(time::Duration::from_secs(30)));
     println!("result={:?}", result);
     let result = result.expect("To have successful retry");
     assert!(result.is_success());
@@ -442,14 +453,25 @@ fn test_global_client() {
 
     let _guard = init();
 
-    let client = client::Client::<TimeoutCfg>::new();
-    yukikaze::rt::set(client);
+    yukikaze::rt::set_with_config::<SmolRedirect>();
 
-    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
-
-    let result = request.send().finish();
+    let request = client::request::Request::get(BIN_ABS_REDIRECT_2).expect("To create get request").empty();
+    let result = request.send_with_redirect().finish();
     println!("result={:?}", result);
-    assert!(result.is_err());
+    let result = result.expect("Success get with redirect");
+    assert!(result.is_success());
+
+    let request = client::request::Request::get(BIN_REL_REDIRECT_2).expect("To create get request").empty();
+    let result = request.send_with_redirect().finish();
+    println!("result={:?}", result);
+    let result = result.expect("Success get with redirect");
+    assert!(result.is_success());
+
+    let request = client::request::Request::get(BIN_ABS_REDIRECT_3).expect("To create get request").empty();
+    let result = request.send_with_redirect().finish();
+    println!("result={:?}", result);
+    let result = result.expect("Success get with redirect");
+    assert!(result.is_redirect());
 }
 
 #[cfg(feature = "rt")]
@@ -457,26 +479,8 @@ fn test_global_client() {
 #[test]
 fn test_global_client_not_set() {
     use yukikaze::rt::{AutoRuntime, AutoClient};
-    let client = client::Client::<TimeoutCfg>::new();
-    yukikaze::rt::set(client);
     let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
 
-    let result = request.send().finish();
-    println!("result={:?}", result);
-}
-
-#[cfg(feature = "rt")]
-#[should_panic]
-#[test]
-fn test_global_client_panic_after_guard_drop() {
-    use yukikaze::rt::{AutoRuntime, AutoClient, init};
-
-    let guard = init();
-
-    yukikaze::rt::set_with_config::<TimeoutCfg>();
-    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
-
-    drop(guard);
     let result = request.send().finish();
     println!("result={:?}", result);
 }

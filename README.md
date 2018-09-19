@@ -8,18 +8,37 @@
 
 [Documentation](https://doumanash.github.io/yukikaze-docs/to_deploy/index.html)
 
-Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](https://crates.io/crates/hyper)
+Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](https://crates.io/crates/hyper).
+
+## Available features
+
+- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
+- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default on.
+- `encoding` - Enables encoding crate support. Default off.
+- `rt` - Enables runtime module. Default off.
+
+## Features
+
+- Uses rustls for TLS
+- Support of various types of bodies: Plain text, JSON, multipart and forms
+- Simple redirect policy with option to limit number of redirections.
+- Support for encodings aside from UTF-8.
+- Various helpers to extract useful headers: Cookies, ETag/Last-Modified, Content related headers.
+- File redirection support for response's body.
 
 ## Usage
 
-In order to use Yukikaze-sama you need to create Client.
+In order to use Yukikaze-sama you need to create [Client](client/struct.Client.html).
 
-Configuration of of client can be defined using trait parameter Config.
+Configuration of of client can be defined using trait parameter [Config](client/config/trait.Config.html).
 But default configuration in most cases reasonable for simple requests.
 
-But if you need to work with client in generic context you can use its trait HttpClient.
+But if you need to work with client in generic context you can use its trait [HttpClient](client/trait.HttpClient.html).
 
 ### Making request
+
+Request [builder](client/request/struct.Builder.html) provides rich set of methods
+to configure it, but in simple terms making request boils down to following code:
 
 ```rust
 extern crate yukikaze;
@@ -39,6 +58,8 @@ fn main() {
     println!("response={:?}", response);
 }
 ```
+
+You can use `rt` module to simplify your workflow though.
 
 ## Examples
 

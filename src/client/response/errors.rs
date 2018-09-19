@@ -43,42 +43,40 @@ impl From<mime::FromStrError> for ContentTypeError {
 ///In a case you suspect potential network problems
 ///but you don't want to set too high timeout value for your
 ///client you can rely on it to continue your request.
-pub struct Timeout {
-    inner: hyper::client::ResponseFuture,
+pub struct Timeout<F> {
+    inner: F
 }
 
-impl Timeout {
-    ///Starts request again with new timeout.
-    pub fn retry(self, timeout: time::Duration) -> FutureResponse {
-        FutureResponse::new(self.inner, timeout)
-    }
-}
-
-impl Into<Timeout> for hyper::client::ResponseFuture {
-    fn into(self) -> Timeout {
-        Timeout {
-            inner: self
+impl<F> Timeout<F> {
+    pub(crate) fn new(inner: F) -> Self {
+        Self {
+            inner
         }
+    }
+
+    ///Starts request again with new timeout.
+    pub fn retry(self, timeout: time::Duration) -> FutureResponse<F> {
+        FutureResponse::new(self.inner, timeout)
     }
 }
 
 #[derive(Debug)]
 ///Describes possible response errors.
-pub enum ResponseError {
+pub enum ResponseError<F> {
     ///Response failed due to timeout.
-    Timeout(Timeout),
+    Timeout(Timeout<F>),
     ///Hyper Error.
     HyperError(hyper::error::Error),
     ///Tokio timer threw error.
-    Timer(tokio::timer::Error, Timeout)
+    Timer(tokio::timer::Error, Timeout<F>)
 }
 
-impl ResponseError {
+impl<F> ResponseError<F> {
     ///Attempts to retry, if it is possible.
     ///
     ///Currently retry can be made only for timed out request or when
     ///timer error happened.
-    pub fn retry(self, timeout: time::Duration) -> Result<FutureResponse, hyper::error::Error> {
+    pub fn retry(self, timeout: time::Duration) -> Result<FutureResponse<F>, hyper::error::Error> {
         match self {
             ResponseError::Timeout(tim) => Ok(tim.retry(timeout)),
             ResponseError::HyperError(error) => Err(error),
@@ -87,13 +85,13 @@ impl ResponseError {
     }
 }
 
-impl From<hyper::error::Error> for ResponseError {
-    fn from(error: hyper::error::Error) -> ResponseError {
+impl<F> From<hyper::error::Error> for ResponseError<F> {
+    fn from(error: hyper::error::Error) -> ResponseError<F> {
         ResponseError::HyperError(error)
     }
 }
 
-impl fmt::Display for ResponseError {
+impl<F> fmt::Display for ResponseError<F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &ResponseError::Timeout(_) => write!(f, "Request timed out."),

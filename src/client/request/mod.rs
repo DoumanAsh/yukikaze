@@ -3,7 +3,6 @@
 use ::std::mem;
 use ::std::io::Write;
 use ::std::fmt;
-use ::std::ops::{Deref, DerefMut};
 
 use ::httpdate;
 use ::etag;
@@ -23,12 +22,13 @@ use ::http::header::HeaderValue;
 
 use ::utils;
 
-type HyperRequest = hyper::Request<hyper::Body>;
+pub(crate) type HyperRequest = hyper::Request<hyper::Body>;
 
 #[derive(Debug)]
 ///Http request.
 pub struct Request {
-    pub(crate) inner: HyperRequest
+    pub(crate) parts: http::request::Parts,
+    pub(crate) body: Option<bytes::Bytes>,
 }
 
 pub mod multipart;
@@ -65,27 +65,48 @@ impl Request {
     pub fn delete<U: AsRef<str>>(uri: U) -> Result<Builder, http::uri::InvalidUri> {
         Self::new(hyper::Method::DELETE, uri)
     }
-}
 
-impl From<HyperRequest> for Request {
-    fn from(inner: HyperRequest) -> Self {
-        Self {
-            inner
-        }
+    #[inline]
+    ///Returns reference to method.
+    pub fn method(&self) -> &http::Method {
+        &self.parts.method
+    }
+
+    #[inline]
+    ///Returns mutable reference to method.
+    pub fn method_mut(&mut self) -> &mut http::Method {
+        &mut self.parts.method
+    }
+
+    #[inline]
+    ///Returns reference to headers.
+    pub fn headers(&self) -> &http::HeaderMap {
+        &self.parts.headers
+    }
+
+    #[inline]
+    ///Returns mutable reference to headers.
+    pub fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        &mut self.parts.headers
+    }
+
+    #[inline]
+    ///Returns reference to uri.
+    pub fn uri(&self) -> &http::Uri {
+        &self.parts.uri
+    }
+
+    #[inline]
+    ///Returns mutable reference to uri.
+    pub fn uri_mut(&mut self) -> &mut http::Uri {
+        &mut self.parts.uri
     }
 }
 
-impl Deref for Request {
-    type Target = HyperRequest;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for Request {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+impl Into<HyperRequest> for Request {
+    fn into(self) -> HyperRequest {
+        let body = self.body.map(|body| body.into()).unwrap_or(hyper::Body::empty());
+        HyperRequest::from_parts(self.parts, body)
     }
 }
 
@@ -316,7 +337,7 @@ impl Builder {
     }
 
     ///Creates request with specified body.
-    pub fn body<B: Into<hyper::Body>>(mut self, body: B) -> Request {
+    pub fn body<B: Into<bytes::Bytes>>(mut self, body: Option<B>) -> Request {
         use ::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET};
 
         // set cookies
@@ -337,14 +358,15 @@ impl Builder {
         }
 
         Request {
-            inner: HyperRequest::from_parts(self.parts, body.into())
+            parts: self.parts,
+            body: body.map(|body| body.into())
         }
     }
 
     ///Creates request with Form payload.
     pub fn form<F: Serialize>(self, body: &F) -> Result<Request, serde_urlencoded::ser::Error> {
         let body = serde_urlencoded::to_string(&body)?;
-        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").content_len(body.len() as u64).body(body))
+        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").content_len(body.len() as u64).body(Some(body)))
     }
 
     ///Creates request with JSON payload.
@@ -352,7 +374,7 @@ impl Builder {
         let mut buffer = utils::BytesWriter::new();
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();
-        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").content_len(body.len() as u64).body(body))
+        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").content_len(body.len() as u64).body(Some(body)))
     }
 
     ///Creates request with multipart body.
@@ -362,13 +384,13 @@ impl Builder {
         let content_type = unsafe { http::header::HeaderValue::from_shared_unchecked(content_type.freeze()) };
 
         let (len, body) = body.finish();
-        self.set_header_if_none(header::CONTENT_TYPE, content_type).content_len(len).body(body)
+        self.set_header_if_none(header::CONTENT_TYPE, content_type).content_len(len).body(Some(body))
     }
 
     ///Creates request with no body.
     ///
     ///Explicitly sets `Content-Length` to 0
     pub fn empty(self) -> Request {
-        self.content_len(0).body(hyper::Body::empty())
+        self.content_len(0).body::<bytes::Bytes>(None)
     }
 }
