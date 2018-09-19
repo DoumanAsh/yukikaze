@@ -9,6 +9,15 @@
 //!- `encoding` - Enables encoding crate support. Default off.
 //!- `rt` - Enables runtime module. Default off.
 //!
+//!## Features
+//!
+//!- Uses rustls for TLS
+//!- Support of various types of bodies: Plain text, JSON, multipart and forms
+//!- Simple redirect policy with option to limit number of redirections.
+//!- Support for encodings aside from UTF-8.
+//!- Various helpers to extract useful headers: Cookies, ETag/Last-Modified, Content related headers.
+//!- File redirection support for response's body.
+//!
 //!## Usage
 //!
 //!In order to use Yukikaze-sama you need to create [Client](client/struct.Client.html).
@@ -43,6 +52,11 @@
 //!```
 //!
 //!You can use `rt` module to simplify your workflow though.
+//!
+//!## Examples
+//!
+//!- [fie](https://github.com/DoumanAsh/fie) - CLI shit posting tool for various social medias.
+//!
 //!
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]

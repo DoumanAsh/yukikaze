@@ -128,11 +128,32 @@ pub fn set_default() {
 }
 
 ///Executes HTTP request on global client
-pub fn execute(req: client::Request) -> client::response::FutureResponse {
+pub fn execute(req: client::Request) -> client::response::Future {
     match GLOBAL_GUARD.load(Ordering::Acquire) {
         INITIALIZED => unsafe { match GLOBAL_CLIENT.as_ref() {
             Some(ref client) => client.execute(req),
-            None => ::std::hint::unreachable_unchecked()
+            None => unreach!(),
+        }},
+        _ => panic!("Client is not set")
+    }
+}
+
+///Executes HTTP request on global client with redirect supprot
+pub fn execute_with_redirect(req: client::Request) -> client::response::RedirectFuture {
+    match GLOBAL_GUARD.load(Ordering::Acquire) {
+        INITIALIZED => unsafe { match GLOBAL_CLIENT.as_ref() {
+            Some(ref client) => client.with_redirect(req),
+            None => unreach!(),
+        }},
+        _ => panic!("Client is not set")
+    }
+}
+
+pub(crate) fn execute_raw_hyper(req: client::request::HyperRequest) -> ::hyper::client::ResponseFuture {
+    match GLOBAL_GUARD.load(Ordering::Acquire) {
+        INITIALIZED => unsafe { match GLOBAL_CLIENT.as_ref() {
+            Some(ref client) => client.execute_raw_hyper(req),
+            None => unreach!(),
         }},
         _ => panic!("Client is not set")
     }
@@ -181,13 +202,21 @@ pub fn handle() -> Handle {
 ///Trait to bootstrap your requests.
 pub trait AutoClient {
     ///Sends request using default client.
-    fn send(self) -> client::response::FutureResponse;
+    fn send(self) -> client::response::Future;
+
+    ///Sends request using default client with redirect support.
+    fn send_with_redirect(self) -> client::response::RedirectFuture;
 }
 
 impl AutoClient for client::Request {
     #[inline]
-    fn send(self) -> client::response::FutureResponse {
+    fn send(self) -> client::response::Future {
         execute(self)
+    }
+
+    #[inline]
+    fn send_with_redirect(self) -> client::response::RedirectFuture {
+        execute_with_redirect(self)
     }
 }
 

@@ -73,6 +73,14 @@ pub trait Config {
     }
 
     #[inline]
+    ///Returns max number of redirects
+    ///
+    ///By default it is 8.
+    fn max_redirect_num() -> usize {
+        8
+    }
+
+    #[inline]
     ///Allows to hook hyper's Client configuration.
     ///
     ///By default it uses hyper's defaults

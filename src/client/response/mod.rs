@@ -1,7 +1,6 @@
 //!Response primitives.
 
 use ::std::fs;
-use ::std::time;
 use ::std::str::FromStr;
 use ::std::ops::{Deref, DerefMut};
 
@@ -12,19 +11,30 @@ use ::etag;
 use ::encoding;
 use ::mime;
 use ::cookie;
-use ::tokio;
 use ::hyper;
-use ::futures;
-use ::futures::Future;
 use ::serde::de::DeserializeOwned;
 use ::httpdate;
 
-type HyperResponse = hyper::Response<hyper::Body>;
+pub(crate) type HyperResponse = hyper::Response<hyper::Body>;
 
 ///Response errors.
 pub mod errors;
 ///Extractor module.
 pub mod extractor;
+mod future;
+#[cfg(feature = "rt")]
+///Redirect support module.
+pub(crate) mod redirect;
+
+pub use self::future::FutureResponse;
+#[cfg(feature = "rt")]
+pub use self::redirect::HyperRedirectFuture;
+
+///Yukikaze-sama's regular future response.
+pub type Future = FutureResponse<hyper::client::ResponseFuture>;
+#[cfg(feature = "rt")]
+///Yukikaze-sama's future response with redirect support.
+pub type RedirectFuture = FutureResponse<redirect::HyperRedirectFuture>;
 
 #[derive(Debug)]
 ///HTTP Response
@@ -242,58 +252,5 @@ impl Deref for Response {
 impl DerefMut for Response {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
-    }
-}
-
-#[must_use = "Future must be polled to actually get HTTP response"]
-///Ongoing HTTP request.
-pub struct FutureResponse {
-    //We use Option here to
-    //allow future to be moved into Timeout error
-    //
-    //Due to that all branches that handle None
-    //is unreachable.
-    //It should remain impossible for them to be reachable.
-    inner: Option<hyper::client::ResponseFuture>,
-    delay: tokio::timer::Delay,
-}
-
-impl FutureResponse {
-    pub(crate) fn new(inner: hyper::client::ResponseFuture, timeout: time::Duration) -> Self {
-        let delay = tokio::timer::Delay::new(tokio::clock::now() + timeout);
-
-        Self {
-            inner: Some(inner),
-            delay
-        }
-    }
-
-    fn into_timeout(&mut self) -> errors::Timeout {
-        match self.inner.take() {
-            Some(inner) => inner.into(),
-            None => unreach!()
-        }
-    }
-}
-
-impl Future for FutureResponse {
-    type Item = Response;
-    type Error = errors::ResponseError;
-
-    fn poll(&mut self) -> futures::Poll<Self::Item, Self::Error> {
-        match self.inner.as_mut() {
-            Some(inner) => match inner.poll() {
-                Ok(futures::Async::Ready(result)) => return Ok(futures::Async::Ready(result.into())),
-                Ok(futures::Async::NotReady) => (),
-                Err(error) => return Err(errors::ResponseError::HyperError(error))
-            },
-            None => unreach!()
-        }
-
-        match self.delay.poll() {
-            Ok(futures::Async::NotReady) => Ok(futures::Async::NotReady),
-            Ok(futures::Async::Ready(_)) => Err(errors::ResponseError::Timeout(self.into_timeout())),
-            Err(error) => Err(errors::ResponseError::Timer(error, self.into_timeout()))
-        }
     }
 }
