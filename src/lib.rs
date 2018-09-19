@@ -17,6 +17,7 @@
 //!- Support for encodings aside from UTF-8.
 //!- Various helpers to extract useful headers: Cookies, ETag/Last-Modified, Content related headers.
 //!- File redirection support for response's body.
+//!- Notify interface to indicate progress of body's download.
 //!
 //!## Usage
 //!
