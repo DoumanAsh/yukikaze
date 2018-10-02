@@ -13,7 +13,7 @@ Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](ht
 ## Available features
 
 - `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
-- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default on.
+- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default off.
 - `encoding` - Enables encoding crate support. Default off.
 - `rt` - Enables runtime module. Default off.
 
