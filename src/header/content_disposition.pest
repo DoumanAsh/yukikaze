@@ -12,11 +12,11 @@ filename_key = _{
 }
 
 filename_value = {
-    (!quote ~ any)+
+    (!quote ~ ANY)+
 }
 
 filename_value_ext = {
-    (!";" ~ any)+
+    (!";" ~ ANY)+
 }
 
 filename = {
@@ -32,7 +32,7 @@ form_name_key = _{
 }
 
 form_name_value = {
-    (!quote ~ any)+
+    (!quote ~ ANY)+
 }
 
 form_name = {
