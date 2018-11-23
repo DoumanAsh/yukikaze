@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP client library."
 readme = "README.md"
@@ -20,7 +20,7 @@ version = "0.12"
 default-features = false
 
 [dependencies]
-hyper-rustls = "0.14"
+hyper-rustls = "0.15"
 tokio = "0.1"
 bytes = "0.4"
 futures = "0.1"
