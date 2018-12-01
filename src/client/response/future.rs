@@ -1,5 +1,5 @@
 //! Futures responses
-use ::tokio;
+use ::tokio_timer;
 use ::futures;
 use ::futures::Future;
 use ::hyper;
@@ -21,12 +21,12 @@ pub struct FutureResponse<F> {
     //is unreachable.
     //It should remain impossible for them to be reachable.
     inner: Option<F>,
-    delay: tokio::timer::Delay,
+    delay: tokio_timer::Delay,
 }
 
 impl<F> FutureResponse<F> {
     pub(crate) fn new(inner: F, timeout: time::Duration) -> Self {
-        let delay = tokio::timer::Delay::new(tokio::clock::now() + timeout);
+        let delay = tokio_timer::Delay::new(tokio_timer::clock::now() + timeout);
 
         Self {
             inner: Some(inner),

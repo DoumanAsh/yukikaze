@@ -150,7 +150,7 @@ impl Future for HyperRedirectFuture {
                                                        .expect("To crate redirect");
             *new_req.headers_mut() = self.cache.headers.clone();
 
-            self.inner = Some(rt::execute_raw_hyper(new_req));
+            self.inner = Some(rt::client::execute_raw_hyper(new_req));
         }
     }
 }

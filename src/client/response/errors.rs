@@ -4,7 +4,7 @@ use ::std::fs;
 use ::std::io;
 use ::std::string;
 
-use ::tokio;
+use ::tokio_timer;
 use ::mime;
 use ::hyper;
 use ::serde_json;
@@ -68,7 +68,7 @@ pub enum ResponseError<F> {
     ///Hyper Error.
     HyperError(hyper::error::Error),
     ///Tokio timer threw error.
-    Timer(tokio::timer::Error, Timeout<F>)
+    Timer(tokio_timer::Error, Timeout<F>)
 }
 
 impl<F> ResponseError<F> {

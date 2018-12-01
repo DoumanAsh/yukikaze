@@ -72,7 +72,9 @@ pub extern crate httpdate;
 pub extern crate mime;
 extern crate mime_guess;
 pub extern crate etag;
+#[cfg(feature = "rt")]
 pub extern crate tokio;
+pub extern crate tokio_timer;
 pub extern crate hyper;
 pub extern crate futures;
 pub extern crate data_encoding;

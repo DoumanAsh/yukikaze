@@ -24,9 +24,6 @@ const BIN_JSON: &'static str = "http://httpbin.org/json";
 const BIN_BASIC_AUTH: &'static str = "http://httpbin.org/basic-auth";
 const BIN_ETAG: &'static str = "http://httpbin.org/etag";
 const BIN_COOKIE: &'static str = "http://httpbin.org/cookies";
-const BIN_ABS_REDIRECT_2: &'static str = "http://httpbin.org/absolute-redirect/2";
-const BIN_REL_REDIRECT_2: &'static str = "http://httpbin.org/redirect/2";
-const BIN_ABS_REDIRECT_3: &'static str = "http://httpbin.org/absolute-redirect/3";
 
 fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
     tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
@@ -449,29 +446,40 @@ fn decode_non_utf8() {
 #[cfg(feature = "rt")]
 #[test]
 fn test_global_client() {
+    const BIN_ABS_REDIRECT_2: &'static str = "http://httpbin.org/absolute-redirect/2";
+    const BIN_REL_REDIRECT_2: &'static str = "http://httpbin.org/redirect/2";
+    const BIN_ABS_REDIRECT_3: &'static str = "http://httpbin.org/absolute-redirect/3";
+
     use yukikaze::rt::{AutoRuntime, AutoClient, init};
 
     let _guard = init();
 
-    yukikaze::rt::set_with_config::<SmolRedirect>();
+    {
+        let _global = yukikaze::rt::GlobalClient::with_config::<SmolRedirect>();
 
-    let request = client::request::Request::get(BIN_ABS_REDIRECT_2).expect("To create get request").empty();
-    let result = request.send_with_redirect().finish();
-    println!("result={:?}", result);
-    let result = result.expect("Success get with redirect");
-    assert!(result.is_success());
+        let request = client::request::Request::get(BIN_ABS_REDIRECT_2).expect("To create get request").empty();
+        let result = request.send_with_redirect().finish();
+        println!("result={:?}", result);
+        let result = result.expect("Success get with redirect");
+        assert!(result.is_success());
 
-    let request = client::request::Request::get(BIN_REL_REDIRECT_2).expect("To create get request").empty();
-    let result = request.send_with_redirect().finish();
-    println!("result={:?}", result);
-    let result = result.expect("Success get with redirect");
-    assert!(result.is_success());
+        let request = client::request::Request::get(BIN_REL_REDIRECT_2).expect("To create get request").empty();
+        let result = request.send_with_redirect().finish();
+        println!("result={:?}", result);
+        let result = result.expect("Success get with redirect");
+        assert!(result.is_success());
 
-    let request = client::request::Request::get(BIN_ABS_REDIRECT_3).expect("To create get request").empty();
-    let result = request.send_with_redirect().finish();
-    println!("result={:?}", result);
-    let result = result.expect("Success get with redirect");
-    assert!(result.is_redirect());
+        let request = client::request::Request::get(BIN_ABS_REDIRECT_3).expect("To create get request").empty();
+        let result = request.send_with_redirect().finish();
+        println!("result={:?}", result);
+        let result = result.expect("Success get with redirect");
+        assert!(result.is_redirect());
+    }
+
+    {
+        //Try to init it second time
+        let _global = yukikaze::rt::GlobalClient::with_config::<SmolRedirect>();
+    }
 }
 
 #[cfg(feature = "rt")]
