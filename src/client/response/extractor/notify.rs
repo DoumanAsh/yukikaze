@@ -41,9 +41,9 @@
 //!}
 //!```
 
-use ::std::sync::mpsc as std_mpsc;
+use std::sync::mpsc as std_mpsc;
 
-use ::futures::sync::mpsc;
+use futures::sync::mpsc;
 
 ///Describes Body download progress
 pub trait Notifier {

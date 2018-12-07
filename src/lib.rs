@@ -70,7 +70,6 @@ pub extern crate percent_encoding;
 pub extern crate http;
 pub extern crate httpdate;
 pub extern crate mime;
-extern crate mime_guess;
 pub extern crate etag;
 #[cfg(feature = "rt")]
 pub extern crate tokio;
@@ -83,7 +82,6 @@ pub extern crate bytes;
 pub extern crate flate2;
 #[cfg(feature = "encoding")]
 pub extern crate encoding;
-extern crate hyper_rustls;
 
 extern crate pest;
 #[macro_use]

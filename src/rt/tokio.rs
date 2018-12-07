@@ -1,10 +1,10 @@
 //!Tokio runtime module
 
-use ::tokio::runtime::current_thread::{Runtime, Handle};
-use ::futures::{IntoFuture, Future};
+use tokio::runtime::current_thread::{Runtime, Handle};
+use futures::{IntoFuture, Future};
 
-use ::std::cell::Cell;
-use ::std::marker::PhantomData;
+use std::cell::Cell;
+use std::marker::PhantomData;
 
 thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(None));
 

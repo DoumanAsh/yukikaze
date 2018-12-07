@@ -1,7 +1,7 @@
-use ::bytes;
+use bytes;
 
-use ::std::mem;
-use ::std::io;
+use std::mem;
+use std::io;
 
 const DEFAULT_CAPACITY: usize = 4096;
 const SMOL_CAPCITY: usize = 64;
@@ -12,7 +12,7 @@ const SMOL_CAPCITY: usize = 64;
 macro_rules! unreach {
     () => ({
         unsafe {
-            ::std::hint::unreachable_unchecked();
+            std::hint::unreachable_unchecked();
         }
     })
 }

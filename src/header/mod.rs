@@ -1,6 +1,6 @@
 //!Headers module
 
-pub use ::http::header::*;
+pub use http::header::*;
 
 mod content_encoding;
 mod content_disposition;

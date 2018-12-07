@@ -1,15 +1,15 @@
 //! Provides response future that handles redirection
 
-use ::std::path::Path;
+use std::path::Path;
 
-use ::bytes;
-use ::futures;
-use ::futures::Future;
-use ::hyper;
-use ::http::{Method, Uri, HeaderMap, StatusCode};
+use bytes;
+use futures;
+use futures::Future;
+use hyper;
+use http::{Method, Uri, HeaderMap, StatusCode};
 
-use ::header;
-use ::rt;
+use crate::header;
+use crate::rt;
 
 use super::{HyperResponse};
 

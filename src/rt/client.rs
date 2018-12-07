@@ -3,7 +3,7 @@
 use crate::client::HttpClient;
 use crate::client::config::Config;
 
-use ::std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 //Not set yet
 const UNINITIALIZED: usize = 0;

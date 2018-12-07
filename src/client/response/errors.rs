@@ -1,13 +1,13 @@
-use ::std::time;
-use ::std::fmt;
-use ::std::fs;
-use ::std::io;
-use ::std::string;
+use std::time;
+use std::fmt;
+use std::fs;
+use std::io;
+use std::string;
 
-use ::tokio_timer;
-use ::mime;
-use ::hyper;
-use ::serde_json;
+use tokio_timer;
+use mime;
+use hyper;
+use serde_json;
 
 use super::FutureResponse;
 

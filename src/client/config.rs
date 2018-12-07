@@ -1,13 +1,13 @@
 //!Describes client configuration
 
-use ::std::io::Write;
-use ::std::time;
+use std::io::Write;
+use std::time;
 
-use ::http;
-use ::header;
-use ::hyper;
+use http;
+use hyper;
 
-use ::utils;
+use crate::utils;
+use crate::header;
 
 ///Generic config trait.
 ///

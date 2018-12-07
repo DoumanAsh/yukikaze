@@ -1,26 +1,25 @@
 //!Request primitives.
 
-use ::std::mem;
-use ::std::io::Write;
-use ::std::fmt;
+use std::mem;
+use std::io::Write;
+use std::fmt;
 
-use ::httpdate;
-use ::etag;
-use ::cookie;
-use ::data_encoding::BASE64;
-use ::http;
-use ::hyper;
-use ::bytes;
-use ::bytes::BufMut;
-use ::serde::Serialize;
-use ::serde_json;
-use ::serde_urlencoded;
+use httpdate;
+use etag;
+use cookie;
+use data_encoding::BASE64;
+use http;
+use hyper;
+use bytes;
+use bytes::BufMut;
+use serde::Serialize;
+use serde_json;
+use serde_urlencoded;
+use http::HttpTryFrom;
+use http::header::HeaderValue;
 
-use ::header;
-use ::http::HttpTryFrom;
-use ::http::header::HeaderValue;
-
-use ::utils;
+use crate::header;
+use crate::utils;
 
 pub(crate) type HyperRequest = hyper::Request<hyper::Body>;
 

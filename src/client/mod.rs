@@ -32,10 +32,10 @@
 //!
 //!```
 
-use ::header;
+use crate::header;
 
-use ::hyper;
-use ::hyper_rustls;
+use hyper;
+use hyper_rustls;
 
 use std::fmt;
 use std::marker::PhantomData;

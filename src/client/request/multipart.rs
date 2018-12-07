@@ -1,16 +1,16 @@
 //!Multipart support
 
-use ::bytes::Bytes;
-use ::mime::Mime;
-use ::mime_guess::guess_mime_type;
+use bytes::Bytes;
+use mime::Mime;
+use mime_guess::guess_mime_type;
 
-use ::std::path;
-use ::std::fs;
-use ::std::io;
-use ::std::io::Write;
+use std::path;
+use std::fs;
+use std::io;
+use std::io::Write;
 
-use ::header::{ContentDisposition, Filename};
-use ::utils::BytesWriter;
+use crate::header::{ContentDisposition, Filename};
+use crate::utils::BytesWriter;
 
 const DEFAULT_BOUNDARY: &'static str = "yuki";
 

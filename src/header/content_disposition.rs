@@ -1,7 +1,7 @@
-use ::percent_encoding::{percent_encode, PATH_SEGMENT_ENCODE_SET, percent_decode, EncodeSet};
-use ::pest::Parser;
+use percent_encoding::{percent_encode, PATH_SEGMENT_ENCODE_SET, percent_decode, EncodeSet};
+use pest::Parser;
 
-use ::std::fmt;
+use std::fmt;
 
 #[cfg(debug_assertions)]
 const _GRAMMAR: &'static str = include_str!("content_disposition.pest");

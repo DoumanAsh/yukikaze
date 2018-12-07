@@ -1,6 +1,6 @@
 //! Request setter tags
 
-use ::header;
+use crate::header;
 
 ///Describes how to set ETag in request.
 pub trait EtagMode {

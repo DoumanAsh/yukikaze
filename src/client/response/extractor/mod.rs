@@ -1,29 +1,29 @@
 ///!Response extractors
 
-use ::std::fs;
-use ::std::io;
-use ::std::io::Write;
-use ::std::mem;
-use ::std::marker::PhantomData;
+use std::fs;
+use std::io;
+use std::io::Write;
+use std::mem;
+use std::marker::PhantomData;
 
-use ::header;
-use ::utils;
+use crate::header;
+use crate::utils;
 use super::errors;
 use super::errors::BodyReadError;
 
 #[cfg(feature = "encoding")]
-use ::encoding;
-use ::mime;
+use encoding;
+use mime;
 #[cfg(feature = "flate2")]
-use ::flate2;
-use ::hyper;
-use ::http;
-use ::futures;
-use ::futures::{Future, Stream};
-use ::bytes;
-use ::serde_json;
-use ::serde::de::DeserializeOwned;
-use ::cookie;
+use flate2;
+use hyper;
+use http;
+use futures;
+use futures::{Future, Stream};
+use bytes;
+use serde_json;
+use serde::de::DeserializeOwned;
+use cookie;
 
 //The size of buffer to use by default.
 const BUFFER_SIZE: usize = 4096;

@@ -1,19 +1,19 @@
 //!Response primitives.
 
-use ::std::fs;
-use ::std::str::FromStr;
-use ::std::ops::{Deref, DerefMut};
+use std::fs;
+use std::str::FromStr;
+use std::ops::{Deref, DerefMut};
 
-use ::header;
+use crate::header;
 
-use ::etag;
+use etag;
 #[cfg(feature = "encoding")]
-use ::encoding;
-use ::mime;
-use ::cookie;
-use ::hyper;
-use ::serde::de::DeserializeOwned;
-use ::httpdate;
+use encoding;
+use mime;
+use cookie;
+use hyper;
+use serde::de::DeserializeOwned;
+use httpdate;
 
 pub(crate) type HyperResponse = hyper::Response<hyper::Body>;
 

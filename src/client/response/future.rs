@@ -1,12 +1,12 @@
 //! Futures responses
-use ::tokio_timer;
-use ::futures;
-use ::futures::Future;
-use ::hyper;
+use tokio_timer;
+use futures;
+use futures::Future;
+use hyper;
 
 use super::{HyperResponse, Response, errors};
 
-use ::std::time;
+use std::time;
 
 #[must_use = "Future must be polled to actually get HTTP response"]
 ///Yukikaze-sama's generic future for outgoing HTTP Request.
