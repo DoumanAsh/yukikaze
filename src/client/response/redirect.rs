@@ -82,7 +82,7 @@ impl Future for HyperRedirectFuture {
                         StatusCode::SEE_OTHER => {
                             self.rem_redirect -= 1;
                             match self.rem_redirect {
-                                0 => return Ok(futures::Async::Ready(result.into())),
+                                0 => return Ok(futures::Async::Ready(result)),
                                 _ => {
                                     //All requests should be changed to GET with no body.
                                     //In most cases it is result of successful POST.
@@ -95,11 +95,11 @@ impl Future for HyperRedirectFuture {
                         StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND | StatusCode::TEMPORARY_REDIRECT | StatusCode::PERMANENT_REDIRECT => {
                             self.rem_redirect -= 1;
                             match self.rem_redirect {
-                                0 => return Ok(futures::Async::Ready(result.into())),
+                                0 => return Ok(futures::Async::Ready(result)),
                                 _ => result,
                             }
                         },
-                        _ => return Ok(futures::Async::Ready(result.into())),
+                        _ => return Ok(futures::Async::Ready(result)),
                     },
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
                     Err(error) => return Err(error),
@@ -140,10 +140,10 @@ impl Future for HyperRedirectFuture {
                         hyper::Uri::from_parts(loc_parts).expect("Create redirect URI")
                     },
                 },
-                None => return Ok(futures::Async::Ready(redirect.into()))
+                None => return Ok(futures::Async::Ready(redirect))
             };
 
-            let body = self.cache.body.as_ref().map(|body| body.clone().into()).unwrap_or(hyper::Body::empty());
+            let body = self.cache.body.as_ref().map(|body| body.clone().into()).unwrap_or_else(hyper::Body::empty);
             let mut new_req = hyper::Request::builder().method(self.cache.method.clone())
                                                        .uri(location)
                                                        .body(body)

@@ -98,7 +98,7 @@ impl Response {
                                          .and_then(|content_type| content_type.to_str().ok());
 
         if let Some(content_type) = content_type {
-            content_type.parse::<mime::Mime>().map(|mime| Some(mime)).map_err(errors::ContentTypeError::from)
+            content_type.parse::<mime::Mime>().map(Some).map_err(errors::ContentTypeError::from)
         } else {
             Ok(None)
         }

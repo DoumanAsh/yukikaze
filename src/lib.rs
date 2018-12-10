@@ -61,6 +61,7 @@
 //!
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 
 pub extern crate serde;
 pub extern crate serde_json;

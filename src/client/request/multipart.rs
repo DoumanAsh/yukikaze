@@ -109,8 +109,8 @@ impl Form {
             return (0, bytes.freeze());
         }
 
-        *(&mut bytes[len-2]) = 45; //'-'
-        *(&mut bytes[len-1]) = 45;
+        bytes[len-2] = 45; //'-'
+        bytes[len-1] = 45;
 
         bytes.extend_from_slice("\r\n".as_bytes());
         let len = len as u64 + 2;

@@ -104,7 +104,7 @@ impl Request {
 
 impl Into<HyperRequest> for Request {
     fn into(self) -> HyperRequest {
-        let body = self.body.map(|body| body.into()).unwrap_or(hyper::Body::empty());
+        let body = self.body.map(|body| body.into()).unwrap_or_else(hyper::Body::empty);
         HyperRequest::from_parts(self.parts, body)
     }
 }
@@ -187,23 +187,23 @@ impl Builder {
     ///semicolon.
     pub fn set_etag<E: tags::EtagMode>(mut self, etag: &etag::EntityTag, _: E) -> Self {
         let mut buffer = utils::BytesWriter::with_smol_capacity();
-        let _ = match self.headers().remove(E::HEADER_NAME) {
+        let _ = match self.headers().remove(E::header_name()) {
             Some(old) => write!(&mut buffer, "{}, {}", old.to_str().expect("Invalid ETag!"), etag),
             None => write!(&mut buffer, "{}", etag),
         };
 
         let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
-        self.headers().insert(E::HEADER_NAME, value);
+        self.headers().insert(E::header_name(), value);
         self
     }
 
     ///Sets HttpDate value into corresponding header.
-    pub fn set_date<E: tags::DateMode>(mut self, date: &httpdate::HttpDate, _: E) -> Self {
+    pub fn set_date<E: tags::DateMode>(mut self, date: httpdate::HttpDate, _: E) -> Self {
         let mut buffer = utils::BytesWriter::with_smol_capacity();
         let _ = write!(&mut buffer, "{}", date);
         let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
 
-        self.headers().insert(E::HEADER_NAME, value);
+        self.headers().insert(E::header_name(), value);
         self
     }
 
