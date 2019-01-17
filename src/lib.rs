@@ -74,7 +74,7 @@ pub extern crate http;
 pub extern crate httpdate;
 pub extern crate mime;
 pub extern crate etag;
-#[cfg(feature = "rt")]
+#[cfg(feature = "rt-tokio")]
 pub extern crate tokio;
 pub extern crate tokio_timer;
 pub extern crate hyper;
