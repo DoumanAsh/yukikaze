@@ -94,5 +94,5 @@ extern crate pest_derive;
 mod utils;
 pub mod header;
 pub mod client;
-#[cfg(any(feature = "rt", feature = "rt-client", feature = "rt-tokio"))]
+#[cfg(any(feature = "rt-client", feature = "rt-tokio"))]
 pub mod rt;
