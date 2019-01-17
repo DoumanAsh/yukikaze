@@ -13,8 +13,10 @@ Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](ht
 
 - `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
 - `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default off.
-- `encoding` - Enables encoding crate support. Default off.
-- `rt` - Enables runtime module. Default off.
+- `encoding` - Enables `encoding` crate support. Default off.
+- `rt-tokio` - Enables tokio runtime module. Default off.
+- `rt-client` - Enables Yukikaze client runtime module. Default off.
+- `rt` - Enables all runtime modules. Default off.
 
 ## Features
 
@@ -69,7 +71,7 @@ You can use `rt` module to simplify your workflow though.
 
 **Q:** Why not just use [reqwest](https://github.com/seanmonstar/reqwest)/[actix-web](https://github.com/actix/actix-web)/[mio_httpc](https://github.com/SergejJurecko/mio_httpc)?
 
-**A:** Reqwest doesn't use rustls, actix-web client comes with lots of server code and mio_httpc is
+**A:** Reqwest API sucks, actix-web client comes with lots of server code and mio_httpc is
 unknown beast to me(I just found out about it when created Yukikaze).
 
 - - -

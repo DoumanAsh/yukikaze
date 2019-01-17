@@ -22,17 +22,17 @@ pub mod errors;
 ///Extractor module.
 pub mod extractor;
 mod future;
-#[cfg(feature = "rt")]
+#[cfg(feature = "rt-client")]
 ///Redirect support module.
 pub(crate) mod redirect;
 
 pub use self::future::FutureResponse;
-#[cfg(feature = "rt")]
+#[cfg(feature = "rt-client")]
 pub use self::redirect::HyperRedirectFuture;
 
 ///Yukikaze-sama's regular future response.
 pub type Future = FutureResponse<hyper::client::ResponseFuture>;
-#[cfg(feature = "rt")]
+#[cfg(feature = "rt-client")]
 ///Yukikaze-sama's future response with redirect support.
 pub type RedirectFuture = FutureResponse<redirect::HyperRedirectFuture>;
 

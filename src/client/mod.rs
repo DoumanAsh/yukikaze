@@ -54,8 +54,10 @@ pub use self::request::Request;
 pub trait HttpClient {
     ///Starts sending HTTP request.
     fn execute(&self, request: request::Request) -> response::Future;
-    #[cfg(feature = "rt")]
+    #[cfg(feature = "rt-client")]
     ///Starts sending HTTP request with redirect support.
+    ///
+    ///Available only when `rt-client` is enabled.
     fn with_redirect(&self, request: request::Request) -> response::RedirectFuture;
     ///Executes raw hyper request and returns its future.
     fn execute_raw_hyper(&self, request: HyperRequest) -> hyper::client::ResponseFuture;
@@ -118,7 +120,7 @@ impl<C: config::Config> HttpClient for Client<C> {
         response::FutureResponse::new(self.inner.request(request.into()), C::timeout())
     }
 
-    #[cfg(feature = "rt")]
+    #[cfg(feature = "rt-client")]
     fn with_redirect(&self, mut request: request::Request) -> response::RedirectFuture {
         Self::apply_headers(&mut request);
         let cache = response::redirect::Cache::new(&request);

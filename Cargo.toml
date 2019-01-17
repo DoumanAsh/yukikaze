@@ -53,8 +53,14 @@ features = ["flate2-c", "encoding", "rt"]
 [features]
 default = ["flate2-c"]
 
+# Enables tokio runtime module
+rt-tokio = ["tokio"]
+
+# Enables client runtime module
+rt-client = []
+
 # Enables runtime
-rt = ["tokio"]
+rt = ["rt-tokio", "rt-client"]
 
 # miniz-sys backend for flate2 crate
 flate2-c = ["flate2/miniz-sys"]

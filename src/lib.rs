@@ -7,7 +7,9 @@
 //!- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default off.
 //!- `encoding` - Enables encoding crate support. Default off.
-//!- `rt` - Enables runtime module. Default off.
+//!- `rt-tokio` - Enables tokio runtime module. Default off.
+//!- `rt-client` - Enables Yukikaze client runtime module. Default off.
+//!- `rt` - Enables all runtime modules. Default off.
 //!
 //!## Features
 //!
@@ -92,5 +94,5 @@ extern crate pest_derive;
 mod utils;
 pub mod header;
 pub mod client;
-#[cfg(feature = "rt")]
+#[cfg(any(feature = "rt", feature = "rt-client", feature = "rt-tokio"))]
 pub mod rt;

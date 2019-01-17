@@ -27,8 +27,12 @@
 //!println!("result={:?}", result);
 //!```
 
+#[cfg(feature = "rt-client")]
 pub mod client;
+#[cfg(feature = "rt-tokio")]
 pub mod tokio;
 
+#[cfg(feature = "rt-client")]
 pub use self::client::{GlobalClient, AutoClient};
+#[cfg(feature = "rt-tokio")]
 pub use self::tokio::{init, AutoRuntime};
