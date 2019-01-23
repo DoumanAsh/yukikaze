@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP client library."
 readme = "README.md"
@@ -34,7 +34,7 @@ etag = "1"
 mime = "0.3"
 mime_guess = "^2.0.0-alpha.6"
 
-encoding = { version = "0.2", optional = true }
+encoding_rs = { version = "0.8", optional = true }
 data-encoding = "2"
 
 serde = "1"
@@ -52,6 +52,9 @@ features = ["flate2-c", "encoding", "rt"]
 
 [features]
 default = ["flate2-c"]
+
+# Enables encoding/decoding of text content
+encoding = ["encoding_rs"]
 
 # Enables tokio runtime module
 rt-tokio = ["tokio"]

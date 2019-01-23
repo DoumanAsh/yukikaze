@@ -7,8 +7,6 @@ use std::ops::{Deref, DerefMut};
 use crate::header;
 
 use etag;
-#[cfg(feature = "encoding")]
-use encoding;
 use mime;
 use cookie;
 use hyper;
@@ -108,16 +106,16 @@ impl Response {
     ///Retrieves content's charset encoding, if any.
     ///
     ///If it is omitted, UTF-8 is assumed.
-    pub fn charset_encoding(&self) -> Result<encoding::EncodingRef, errors::ContentTypeError> {
+    pub fn charset_encoding(&self) -> Result<&'static encoding_rs::Encoding, errors::ContentTypeError> {
         let mime = self.mime()?;
         let mime = mime.as_ref().and_then(|mime| mime.get_param(mime::CHARSET));
 
         match mime {
-            Some(charset) => match encoding::label::encoding_from_whatwg_label(charset.as_str()) {
+            Some(charset) => match encoding_rs::Encoding::for_label(charset.as_str().as_bytes()) {
                 Some(enc) => Ok(enc),
                 None => Err(errors::ContentTypeError::UnknownEncoding)
             },
-            None => Ok(encoding::all::UTF_8),
+            None => Ok(encoding_rs::UTF_8),
         }
     }
 

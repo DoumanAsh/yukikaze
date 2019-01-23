@@ -84,7 +84,7 @@ pub extern crate bytes;
 #[cfg(feature = "flate2")]
 pub extern crate flate2;
 #[cfg(feature = "encoding")]
-pub extern crate encoding;
+pub extern crate encoding_rs;
 
 extern crate pest;
 #[macro_use]

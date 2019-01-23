@@ -11,8 +11,6 @@ use crate::utils;
 use super::errors;
 use super::errors::BodyReadError;
 
-#[cfg(feature = "encoding")]
-use encoding;
 use mime;
 #[cfg(feature = "flate2")]
 use flate2;
@@ -148,16 +146,16 @@ impl<N: Notifier> RawBody<N> {
     ///Retrieves content's charset encoding, if any.
     ///
     ///If it is omitted, UTF-8 is assumed.
-    pub fn charset_encoding(&self) -> Result<encoding::EncodingRef, errors::ContentTypeError> {
+    pub fn charset_encoding(&self) -> Result<&'static encoding_rs::Encoding, errors::ContentTypeError> {
         let mime = self.mime()?;
         let mime = mime.as_ref().and_then(|mime| mime.get_param(mime::CHARSET));
 
         match mime {
-            Some(charset) => match encoding::label::encoding_from_whatwg_label(charset.as_str()) {
+            Some(charset) => match encoding_rs::Encoding::for_label(charset.as_str().as_bytes()) {
                 Some(enc) => Ok(enc),
                 None => Err(errors::ContentTypeError::UnknownEncoding)
             },
-            None => Ok(encoding::all::UTF_8),
+            None => Ok(encoding_rs::UTF_8),
         }
     }
     #[inline]
@@ -275,7 +273,7 @@ pub enum Text<N> {
     Init(Option<RawBody<N>>),
     #[cfg(feature = "encoding")]
     #[doc(hidden)]
-    Future(RawBody<N>, Option<encoding::EncodingRef>),
+    Future(RawBody<N>, Option<&'static encoding_rs::Encoding>),
     #[cfg(not(feature = "encoding"))]
     #[doc(hidden)]
     Future(RawBody<N>),
@@ -331,9 +329,10 @@ impl<N: Notifier> Future for Text<N> {
                 #[cfg(feature = "encoding")]
                 Text::Future(fut, enc) => match fut.poll() {
                     Ok(futures::Async::Ready(bytes)) => return match enc {
-                        Some(enc) => enc.decode(&bytes, encoding::types::DecoderTrap::Strict)
-                                        .map_err(|_| BodyReadError::EncodingError)
-                                        .map(|st| futures::Async::Ready(st)),
+                        Some(enc) => match enc.decode(&bytes) {
+                            (result, _, false) => Ok(futures::Async::Ready(result.into_owned())),
+                            (_, _, true) => Err(BodyReadError::EncodingError)
+                        },
                         None => String::from_utf8(bytes.to_vec()).map_err(|error| error.into()).map(|st| futures::Async::Ready(st))
                     },
                     Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
@@ -351,9 +350,9 @@ impl<N: Notifier> Future for Text<N> {
                 #[cfg(feature = "encoding")]
                 Text::Init(raw) => {
                     let raw = raw.take().expect("To have body");
-                    let encoding = raw.charset_encoding().ok().and_then(|enc| match enc.name() {
-                        "utf-8" => None,
-                        _ => Some(enc)
+                    let encoding = raw.charset_encoding().ok().and_then(|enc| match enc == encoding_rs::UTF_8 {
+                        true => None,
+                        _ => Some(enc),
                     });
                     Text::Future(raw, encoding)
                 },
@@ -373,7 +372,7 @@ pub enum Json<J, N> where N: Notifier {
     Init(Option<RawBody<N>>),
     #[cfg(feature = "encoding")]
     #[doc(hidden)]
-    Future(RawBody<N>, Option<encoding::EncodingRef>, PhantomData<J>),
+    Future(RawBody<N>, Option<&'static encoding_rs::Encoding>, PhantomData<J>),
     #[cfg(not(feature = "encoding"))]
     #[doc(hidden)]
     Future(RawBody<N>, PhantomData<J>),
@@ -427,10 +426,11 @@ impl<J: DeserializeOwned, N: Notifier> Future for Json<J, N> {
                 #[cfg(feature = "encoding")]
                 Json::Future(fut, enc, _) => match fut.poll() {
                     Ok(futures::Async::Ready(bytes)) => return match enc {
-                        Some(enc) => enc.decode(&bytes, encoding::types::DecoderTrap::Strict)
-                                        .map_err(|_| BodyReadError::EncodingError)
-                                        .and_then(|decoded| serde_json::from_str(&decoded).map_err(BodyReadError::from))
-                                        .map(|st| futures::Async::Ready(st)),
+                        Some(enc) => match enc.decode(&bytes) {
+                            (result, _, false) => serde_json::from_str(&result).map_err(BodyReadError::from)
+                                                                               .map(|result| futures::Async::Ready(result)),
+                            (_, _, true) => Err(BodyReadError::EncodingError)
+                        },
                         None => return serde_json::from_slice(&bytes).map_err(BodyReadError::from)
                                                                      .map(|st| futures::Async::Ready(st)),
                     },
@@ -449,8 +449,8 @@ impl<J: DeserializeOwned, N: Notifier> Future for Json<J, N> {
                 #[cfg(feature = "encoding")]
                 Json::Init(raw) => {
                     let raw = raw.take().expect("To have body");
-                    let encoding = raw.charset_encoding().ok().and_then(|enc| match enc.name() {
-                        "utf-8" => None,
+                    let encoding = raw.charset_encoding().ok().and_then(|enc| match enc == encoding_rs::UTF_8 {
+                        true => None,
                         _ => Some(enc)
                     });
                     Json::Future(raw, encoding, PhantomData)
