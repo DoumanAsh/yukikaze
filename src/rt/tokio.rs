@@ -6,6 +6,8 @@ use futures::{IntoFuture, Future};
 use std::cell::Cell;
 use std::marker::PhantomData;
 
+const RUNTIME_NOT_AVAIL: &'static str = "Runtime is not available! Initialize it or do not use it within blocking calls!";
+
 thread_local!(static TOKIO: Cell<Option<Runtime>> = Cell::new(None));
 
 ///Guard that controls lifetime of Runtime module
@@ -70,24 +72,17 @@ pub fn run<R: IntoFuture, F: FnOnce() -> R>(runner: F) -> Result<R::Item, R::Err
 ///
 ///It must not be used within blocking call like [run](fn.run.html)
 pub fn spawn<F: Future<Item=(), Error=()> + 'static>(fut: F) {
-    TOKIO.with(|rt| match rt.replace(None) {
-        Some(mut tokio) => {
-            tokio.spawn(fut);
-            rt.set(Some(tokio));
-        },
-        None => panic!("Runtime is not available! Initialize it or do not use it within blocking calls!"),
+    TOKIO.with(|rt| match unsafe { &mut *rt.as_ptr() } {
+        Some(tokio) => tokio.spawn(fut),
+        None => panic!(RUNTIME_NOT_AVAIL)
     });
 }
 
 ///Retrieves tokio's handle.
 pub fn handle() -> Handle {
-    TOKIO.with(|rt| match rt.replace(None) {
-        Some(tokio) => {
-            let res = tokio.handle();
-            rt.set(Some(tokio));
-            res
-        },
-        None => panic!("Runtime is not available! Initialize it or do not use it within blocking calls!"),
+    TOKIO.with(|rt| match unsafe { &*rt.as_ptr() } {
+        Some(tokio) => tokio.handle(),
+        None => panic!(RUNTIME_NOT_AVAIL)
     })
 }
 
@@ -102,13 +97,9 @@ pub trait AutoRuntime: Future + Sized {
     ///
     ///It must not be used within blocking call like [run](fn.run.html)
     fn finish(self) -> Result<Self::Item, Self::Error> {
-        TOKIO.with(|rt| match rt.replace(None) {
-            Some(mut tokio) => {
-                let res = tokio.block_on(self);
-                rt.set(Some(tokio));
-                res
-            },
-            None => panic!("Runtime is not available! Initialize it or do not use it within blocking calls!"),
+        TOKIO.with(|rt| match unsafe { &mut *rt.as_ptr() } {
+            Some(tokio) => tokio.block_on(self),
+            None => panic!(RUNTIME_NOT_AVAIL)
         })
     }
 }
