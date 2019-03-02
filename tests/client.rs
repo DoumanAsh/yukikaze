@@ -95,7 +95,7 @@ fn make_request() {
     {
         assert_eq!(request.method(), http::method::Method::GET);
         assert_eq!(request.uri(), BIN_URL);
-        assert_eq!(request.headers().len(), 2);
+        assert_eq!(request.headers().len(), 1);
         let auth = request.headers().get(http::header::AUTHORIZATION).expect("To have AUTHORIZATION header");
         let auth = auth.to_str().expect("Convert AUTHORIZATION to str");
         assert!(auth.starts_with("basic "));
