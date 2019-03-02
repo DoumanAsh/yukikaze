@@ -1,7 +1,5 @@
-use bytes;
-
 use std::mem;
-use std::io;
+use std::io::{self, Write};
 
 const DEFAULT_CAPACITY: usize = 4096;
 const SMOL_CAPCITY: usize = 64;
@@ -90,4 +88,10 @@ impl io::Write for BytesWriter {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+}
+
+pub fn content_len_value(len: u64) -> http::header::HeaderValue {
+    let mut res = BytesWriter::with_capacity(1);
+    let _ = write!(&mut res, "{}", len);
+    unsafe { http::header::HeaderValue::from_shared_unchecked(res.freeze()) }
 }

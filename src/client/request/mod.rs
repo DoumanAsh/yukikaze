@@ -4,13 +4,7 @@ use std::mem;
 use std::io::Write;
 use std::fmt;
 
-use httpdate;
-use etag;
-use cookie;
 use data_encoding::BASE64;
-use http;
-use hyper;
-use bytes;
 use bytes::BufMut;
 use serde::Serialize;
 use serde_json;
@@ -336,6 +330,9 @@ impl Builder {
     }
 
     ///Creates request with specified body.
+    ///
+    ///Adds `Content-Length` if not specified by user.
+    ///Following RFC, adds zero length only for `PUT` and `POST` requests
     pub fn body<B: Into<bytes::Bytes>>(mut self, body: Option<B>) -> Request {
         use ::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET};
 
@@ -356,16 +353,41 @@ impl Builder {
             let _ = self.headers().insert(http::header::COOKIE, cookie);
         }
 
+        let body = body.map(|body| body.into());
+
+        //We automatically insert Content-Length: 0 for empty requests
+        //with POST/PUT and removed it otherwise.
+        //For everything else we just add Content-Length unless it is already in
+        match body.as_ref() {
+            None => match self.parts.method {
+                hyper::Method::PUT | hyper::Method::POST => match self.parts.headers.entry(http::header::CONTENT_LENGTH).expect("CONTENT_LENGTH to be valid header key") {
+                    http::header::Entry::Vacant(value) => {
+                        value.insert(utils::content_len_value(0));
+                    },
+                    _ => (),
+                },
+                _ => {
+                    self.parts.headers.remove(http::header::CONTENT_LENGTH);
+                },
+            },
+            Some(body) => match self.parts.headers.entry(http::header::CONTENT_LENGTH).expect("CONTENT_LENGTH to be valid header key") {
+                http::header::Entry::Vacant(value) => {
+                    value.insert(utils::content_len_value(body.len() as u64));
+                },
+                _ => (),
+            },
+        }
+
         Request {
             parts: self.parts,
-            body: body.map(|body| body.into())
+            body,
         }
     }
 
     ///Creates request with Form payload.
     pub fn form<F: Serialize>(self, body: &F) -> Result<Request, serde_urlencoded::ser::Error> {
         let body = serde_urlencoded::to_string(&body)?;
-        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").content_len(body.len() as u64).body(Some(body)))
+        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(Some(body)))
     }
 
     ///Creates request with JSON payload.
@@ -373,7 +395,7 @@ impl Builder {
         let mut buffer = utils::BytesWriter::new();
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();
-        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").content_len(body.len() as u64).body(Some(body)))
+        Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/json").body(Some(body)))
     }
 
     ///Creates request with multipart body.
@@ -382,14 +404,14 @@ impl Builder {
         let _ = write!(&mut content_type, "multipart/form-data; boundary={}", body.boundary);
         let content_type = unsafe { http::header::HeaderValue::from_shared_unchecked(content_type.freeze()) };
 
-        let (len, body) = body.finish();
-        self.set_header_if_none(header::CONTENT_TYPE, content_type).content_len(len).body(Some(body))
+        let (_, body) = body.finish();
+        self.set_header_if_none(header::CONTENT_TYPE, content_type).body(Some(body))
     }
 
     ///Creates request with no body.
     ///
-    ///Explicitly sets `Content-Length` to 0
+    ///Explicitly sets `Content-Length` to 0, if necessary
     pub fn empty(self) -> Request {
-        self.content_len(0).body::<bytes::Bytes>(None)
+        self.body::<bytes::Bytes>(None)
     }
 }
