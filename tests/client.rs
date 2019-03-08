@@ -98,8 +98,8 @@ fn make_request() {
         assert_eq!(request.headers().len(), 1);
         let auth = request.headers().get(http::header::AUTHORIZATION).expect("To have AUTHORIZATION header");
         let auth = auth.to_str().expect("Convert AUTHORIZATION to str");
-        assert!(auth.starts_with("basic "));
-        assert_eq!(auth, "basic TG9sa2E6UGFzcw==");
+        assert!(auth.starts_with("Basic "));
+        assert_eq!(auth, "Basic TG9sa2E6UGFzcw==");
     }
 
     let mut rt = get_tokio_rt();

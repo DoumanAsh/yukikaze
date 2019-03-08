@@ -263,7 +263,7 @@ impl Builder {
 
     ///Adds basic authentication header.
     pub fn basic_auth<U: fmt::Display, P: fmt::Display>(mut self, username: U, password: Option<P>) -> Self {
-        const BASIC: &'static str = "basic ";
+        const BASIC: &'static str = "Basic ";
 
         let auth = match password {
             Some(password) => format!("{}:{}", username, password),
@@ -288,7 +288,7 @@ impl Builder {
     ///Generally tokens already contain only valid symbols for header.
     ///So the function doesn't encode it using base64.
     pub fn bearer_auth(mut self, token: &str) -> Self {
-        const TYPE: &'static str = "bearer ";
+        const TYPE: &'static str = "Bearer ";
 
         let header_value = unsafe {
             let mut header_value = bytes::BytesMut::with_capacity(token.as_bytes().len() + TYPE.as_bytes().len());
