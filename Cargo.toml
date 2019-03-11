@@ -59,6 +59,10 @@ encoding = ["encoding_rs"]
 # Enables tokio runtime module
 rt-tokio = ["tokio"]
 
+# Enable multi-threaded tokio runtime
+# Overrides rt-tokio
+rt-tokio-multi = ["tokio"]
+
 # Enables client runtime module
 rt-client = []
 

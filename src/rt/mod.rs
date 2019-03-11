@@ -29,10 +29,15 @@
 
 #[cfg(feature = "rt-client")]
 pub mod client;
-#[cfg(feature = "rt-tokio")]
+#[cfg(all(feature = "rt-tokio", not(feature = "rt-tokio-multi")))]
 pub mod tokio;
+#[cfg(feature = "rt-tokio-multi")]
+pub mod tokio_multi;
+
+#[cfg(feature = "rt-tokio-multi")]
+pub use tokio_multi as tokio;
 
 #[cfg(feature = "rt-client")]
 pub use self::client::{GlobalClient, AutoClient};
-#[cfg(feature = "rt-tokio")]
+#[cfg(any(feature = "rt-tokio", feature = "rt-tokio-multi"))]
 pub use self::tokio::{init, AutoRuntime};
