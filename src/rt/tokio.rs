@@ -3,6 +3,8 @@
 use tokio::runtime::current_thread::{Runtime, Handle};
 use futures::{IntoFuture, Future};
 
+use super::AutoRuntime;
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -29,10 +31,6 @@ impl Drop for Guard {
 ///Initializes new runtime and returns guard that controls its lifetime.
 ///
 ///This function must be called prior to any usage of runtime related functionality:
-///
-///- [run](fn.run.html)
-///- [handle](fn.handle.html)
-///- [AutoRuntime](trait.AutoRuntime.html)
 ///
 ///## Panics
 ///
@@ -86,8 +84,7 @@ pub fn handle() -> Handle {
     })
 }
 
-///Trait to bootstrap your futures.
-pub trait AutoRuntime: Future + Sized {
+impl<F: Future> AutoRuntime for F {
     ///Runs futures to competition.
     ///
     ///Yukikaze-sama uses `current_thread` runtime internally which
@@ -103,5 +100,3 @@ pub trait AutoRuntime: Future + Sized {
         })
     }
 }
-
-impl<F: Future + Sized> AutoRuntime for F {}

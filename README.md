@@ -3,7 +3,7 @@
 [![Build](https://gitlab.com/Douman/yukikaze/badges/master/build.svg)](https://gitlab.com/Douman/yukikaze/pipelines)
 [![Crates.io](https://img.shields.io/crates/v/yukikaze.svg)](https://crates.io/crates/yukikaze)
 [![Documentation](https://docs.rs/yukikaze/badge.svg)](https://docs.rs/crate/yukikaze/)
-[![dependency status](https://deps.rs/crate/yukikaze/0.5.1/status.svg)](https://deps.rs/crate/yukikaze)
+[![dependency status](https://deps.rs/crate/yukikaze/0.5.3/status.svg)](https://deps.rs/crate/yukikaze)
 
 ![Yukikaze image](https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png)
 
@@ -15,8 +15,9 @@ Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](ht
 - `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default off.
 - `encoding` - Enables `encoding` crate support. Default off.
 - `rt-tokio` - Enables tokio runtime module. Default off.
+- `rt-tokio-multi` - Enables multi-threaded tokio runtime. Overrides `rt-tokio`. Default off.
 - `rt-client` - Enables Yukikaze client runtime module. Default off.
-- `rt` - Enables all runtime modules. Default off.
+- `rt` - Enables `rt-tokio` and `rt-client`. Default off.
 
 ## Features
 

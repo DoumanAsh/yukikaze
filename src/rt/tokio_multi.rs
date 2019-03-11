@@ -3,6 +3,8 @@
 use futures::{IntoFuture, Future};
 use tokio::runtime;
 
+use super::AutoRuntime;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::io;
 
@@ -77,10 +79,6 @@ impl Drop for Runtime {
 ///
 ///This function must be called prior to any usage of runtime related functionality:
 ///
-///- [run](fn.run.html)
-///- [handle](fn.handle.html)
-///- [AutoRuntime](trait.AutoRuntime.html)
-///
 ///## Panics
 ///
 ///If runtime is already initialized.
@@ -121,18 +119,6 @@ pub fn spawn<F: Future<Item=(), Error=()> + 'static + Send>(fut: F) {
         }},
         _ => panic!(RUNTIME_NOT_AVAIL)
     }
-}
-
-///Trait to bootstrap your futures.
-pub trait AutoRuntime: Future {
-    ///Runs futures to competition.
-    ///
-    ///Yukikaze-sama uses global runtime to work on your futures
-    ///
-    ///## Note
-    ///
-    ///It must not be used within blocking call like [run](fn.run.html)
-    fn finish(self) -> Result<Self::Item, Self::Error>;
 }
 
 impl<F: Send + 'static + Future<Item=I, Error=E>, I: Send + 'static, E: Send + 'static> AutoRuntime for F {

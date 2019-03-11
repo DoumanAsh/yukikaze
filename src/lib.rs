@@ -8,8 +8,9 @@
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default off.
 //!- `encoding` - Enables encoding crate support. Default off.
 //!- `rt-tokio` - Enables tokio runtime module. Default off.
+//!- `rt-tokio-multi` - Enables multi-threaded tokio runtime. Overrides `rt-tokio`. Default off.
 //!- `rt-client` - Enables Yukikaze client runtime module. Default off.
-//!- `rt` - Enables all runtime modules. Default off.
+//!- `rt` - Enables `rt-tokio` and `rt-client`. Default off.
 //!
 //!## Features
 //!

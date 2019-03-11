@@ -34,10 +34,22 @@ pub mod tokio;
 #[cfg(feature = "rt-tokio-multi")]
 pub mod tokio_multi;
 
+///Trait to bootstrap your futures.
+pub trait AutoRuntime: futures::Future {
+    ///Runs futures to competition.
+    ///
+    ///Yukikaze-sama uses global runtime to work on your futures
+    ///
+    ///## Note
+    ///
+    ///It must not be used from within async context
+    fn finish(self) -> Result<Self::Item, Self::Error>;
+}
+
 #[cfg(feature = "rt-tokio-multi")]
 pub use tokio_multi as tokio;
 
 #[cfg(feature = "rt-client")]
 pub use self::client::{GlobalClient, AutoClient};
 #[cfg(any(feature = "rt-tokio", feature = "rt-tokio-multi"))]
-pub use self::tokio::{init, AutoRuntime};
+pub use self::tokio::{init};
