@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP client library."
 readme = "README.md"

@@ -53,7 +53,7 @@ impl Form {
 
     ///Adds new field with file.
     pub fn add_file_field(&mut self, field_name: String, file_name: String, mime: &Mime, data: &[u8]) {
-        let content_disposition = ContentDisposition::FormData(Some(field_name), Filename::with_encoded_name(file_name));
+        let content_disposition = ContentDisposition::FormData(Some(field_name), Filename::with_name(file_name));
         let _ = write!(&mut self.storage, "--{}\r\nContent-Disposition: {}\r\n", self.boundary, content_disposition);
         let _ = write!(&mut self.storage, "Content-Type: {}\r\n\r\n", mime);
         let _ = self.storage.write(data);
@@ -78,7 +78,7 @@ impl Form {
 
         let mut file = fs::File::open(&path)?;
         let file_name = match path.file_name().and_then(|file_name| file_name.to_str()) {
-            Some(file_name) => Filename::with_encoded_name(file_name.to_string()),
+            Some(file_name) => Filename::with_name(file_name.to_string()),
             None => Filename::new(),
         };
         let file_meta = file.metadata()?;
