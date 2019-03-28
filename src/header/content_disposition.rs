@@ -1,14 +1,8 @@
 use percent_encoding::{percent_encode, PATH_SEGMENT_ENCODE_SET, percent_decode, EncodeSet};
-use pest::Parser;
 
 use std::fmt;
-
-#[cfg(debug_assertions)]
-const _GRAMMAR: &'static str = include_str!("content_disposition.pest");
-
-#[derive(Parser)]
-#[grammar = "header/content_disposition.pest"]
-struct CdParser;
+use std::str::FromStr;
+use std::error::Error;
 
 #[derive(Debug)]
 ///Filename parameter of `Content-Disposition`
@@ -87,9 +81,16 @@ pub enum ContentDisposition {
     FormData(Option<String>, Filename)
 }
 
+fn split_into_two(text: &str, sep: char) -> (&str, &str) {
+    match text.find(sep) {
+        Some(end) => (&text[..end].trim_end(), &text[end+1..].trim_start()),
+        None => (text, ""),
+    }
+}
+
 macro_rules! parse_file_ext {
     ($param:ident) => {{
-        let mut parts = $param.as_str().splitn(3, '\'');
+        let mut parts = $param.splitn(3, '\'');
 
         let charset = match parts.next() {
             Some(charset) => charset.to_owned(),
@@ -105,88 +106,110 @@ macro_rules! parse_file_ext {
     }}
 }
 
-impl ContentDisposition {
-    ///Parses string into self, if possible.
-    pub fn from_str(text: &str) -> Option<Self> {
-        let result = CdParser::parse(Rule::disposition, text).ok().and_then(|mut result| result.next());
+#[derive(Debug)]
+pub enum ParseError {
+    InvalidDispositionType,
+    UnknownAttachmentParam,
+    UnknownFormParam,
+}
 
-        let result = match result {
-            Some(result) => result.into_inner().next().expect("To have inner pairs"),
-            None => return None,
-        };
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
 
-        let res = match result.as_rule() {
-            Rule::inline => ContentDisposition::Inline,
-            Rule::attachment => {
-                let mut file_name = Filename::Name(None);
+impl Error for ParseError {
+    fn description(&self) -> &str {
+        match self {
+            &ParseError::InvalidDispositionType => "Specified disposition type is not valid. Should be inline, attachment or form-data",
+            &ParseError::UnknownAttachmentParam => "Form-data parameter is invalid. Allowed: filename[*]",
+            &ParseError::UnknownFormParam => "Form-data parameter is invalid. Allowed: name, filename[*]",
+        }
+    }
+}
 
-                let result = result.into_inner()
-                                   .map(|param| param.into_inner().next().unwrap()) //Skip param
-                                   .map(|param| (param.as_rule(), param.into_inner().next().expect("value"))); //Take key's rule and value's match
+impl FromStr for ContentDisposition {
+    type Err = ParseError;
 
-                for (rule, param) in result {
-                    match rule {
-                        Rule::filename => {
-                            match param.as_rule() {
-                                Rule::filename_value => {
-                                    file_name = Filename::Name(Some(param.as_str().trim().to_owned()));
-                                },
-                                Rule::filename_value_ext => {
-                                    file_name = parse_file_ext!(param);
-                                    //extended should have priority so break here.
-                                    break;
-                                },
-                                _ => unreachable!()
-                            }
-                        }
-                        _ => unreachable!()
-                    }
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        const NAME: &str = "name";
+        const FILENAME: &str = "filename";
+
+        let text = text.trim();
+
+        let (disp_type, arg) = split_into_two(text, ';');
+
+        if disp_type.eq_ignore_ascii_case("inline") {
+            Ok(ContentDisposition::Inline)
+        } else if disp_type.eq_ignore_ascii_case("attachment") {
+            let mut file_name = Filename::Name(None);
+
+            for arg in arg.split(';').map(|arg| arg.trim()) {
+                let (name, value) = split_into_two(arg, '=');
+
+                if value.len() == 0 {
+                    continue;
                 }
 
-                ContentDisposition::Attachment(file_name)
-            },
-            Rule::form_data => {
-                let mut name = None;
-                let mut file_name = Filename::Name(None);
-
-                let result = result.into_inner()
-                                   .map(|param| param.into_inner().next().unwrap()) //Skip param
-                                   .map(|param| (param.as_rule(), param.into_inner().next().expect("value"))); //Take key's rule and value's match
-
-                for (rule, param) in result {
-                    match rule {
-                        Rule::filename => {
-                            match param.as_rule() {
-                                Rule::filename_value => {
-                                    //Extended should have priority
-                                    if !file_name.is_extended() {
-                                        file_name = Filename::Name(Some(param.as_str().trim().to_owned()));
-                                    }
-                                },
-                                Rule::filename_value_ext => {
-                                    file_name = parse_file_ext!(param);
-                                },
-                                _ => unreachable!()
-                            }
-                        },
-                        Rule::form_name => {
-                            match param.as_rule() {
-                                Rule::form_name_value => {
-                                    name = Some(param.as_str().trim().to_owned());
-                                },
-                                _ => unreachable!()
-                            }
-                        }
-                        _ => unreachable!()
-                    }
+                if name.len() < FILENAME.len() {
+                    return Err(ParseError::UnknownAttachmentParam)
                 }
 
-                ContentDisposition::FormData(name, file_name)
+                let prefix = &name[..FILENAME.len()];
+                if prefix.eq_ignore_ascii_case("filename") {
+                    let value = value.trim_matches('"');
+
+                    if let Some(_) = name.rfind('*') {
+                        file_name = parse_file_ext!(value);
+                        break;
+                    } else {
+                        file_name = Filename::Name(Some(value.to_owned()));
+                    }
+                } else {
+                    return Err(ParseError::UnknownAttachmentParam)
+                }
             }
-            _ => return None
-        };
 
-        Some(res)
+            Ok(ContentDisposition::Attachment(file_name))
+        } else if disp_type.eq_ignore_ascii_case("form-data") {
+            let mut name_param = None;
+            let mut file_name = Filename::Name(None);
+
+            for arg in arg.split(';').map(|arg| arg.trim()) {
+                let (name, value) = split_into_two(arg, '=');
+
+                if value.len() == 0 {
+                    continue;
+                }
+
+                if name.eq_ignore_ascii_case(NAME) {
+                    name_param = Some(value.trim_matches('"').to_owned());
+                    continue;
+                }
+                else if name.len() < FILENAME.len() {
+                    return Err(ParseError::UnknownFormParam)
+                }
+
+                let prefix = &name[..FILENAME.len()];
+                if prefix.eq_ignore_ascii_case("filename") {
+                    let value = value.trim_matches('"');
+
+                    if let Some(_) = name.rfind('*') {
+                        file_name = parse_file_ext!(value);
+                        break;
+                    } else if !file_name.is_extended() {
+                        file_name = Filename::Name(Some(value.to_owned()));
+                    }
+                } else {
+                    return Err(ParseError::UnknownFormParam)
+                }
+            }
+
+            Ok(ContentDisposition::FormData(name_param, file_name))
+        } else {
+            Err(ParseError::InvalidDispositionType)
+        }
     }
 }
 
@@ -232,7 +255,7 @@ impl fmt::Display for ContentDisposition {
 #[cfg(test)]
 mod tests {
     use ::percent_encoding::{percent_decode};
-    use super::{ContentDisposition, Filename};
+    use super::{FromStr, ContentDisposition, Filename};
 
     #[test]
     fn parse_file_name_extended_ascii() {

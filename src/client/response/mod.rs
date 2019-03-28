@@ -145,7 +145,7 @@ impl Response {
         self.inner.headers()
                   .get(header::CONTENT_DISPOSITION)
                   .and_then(|header| header.to_str().ok())
-                  .and_then(|header| header::ContentDisposition::from_str(header))
+                  .and_then(|header| header::ContentDisposition::from_str(header).ok())
     }
 
     #[inline]

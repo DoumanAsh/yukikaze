@@ -87,10 +87,6 @@ pub extern crate flate2;
 #[cfg(feature = "encoding")]
 pub extern crate encoding_rs;
 
-extern crate pest;
-#[macro_use]
-extern crate pest_derive;
-
 #[macro_use]
 mod utils;
 pub mod header;
