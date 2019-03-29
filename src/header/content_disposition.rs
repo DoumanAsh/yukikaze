@@ -197,7 +197,6 @@ impl FromStr for ContentDisposition {
 
                     if let Some(_) = name.rfind('*') {
                         file_name = parse_file_ext!(value);
-                        break;
                     } else if !file_name.is_extended() {
                         file_name = Filename::Name(Some(value.to_owned()));
                     }
