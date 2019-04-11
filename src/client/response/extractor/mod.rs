@@ -12,17 +12,8 @@ use crate::utils;
 use super::errors;
 use super::errors::BodyReadError;
 
-use mime;
-#[cfg(feature = "flate2")]
-use flate2;
-use hyper;
-use http;
-use futures;
 use futures::{Future, Stream};
-use bytes;
-use serde_json;
 use serde::de::DeserializeOwned;
-use cookie;
 
 //The size of buffer to use by default.
 const BUFFER_SIZE: usize = 4096;
@@ -42,7 +33,7 @@ pub struct CookieIter<'a> {
 }
 
 impl<'a> Iterator for CookieIter<'a> {
-    type Item = Result<cookie::Cookie<'a>, cookie::ParseError>;
+    type Item = Result<cookie2::Cookie<'a>, cookie2::ParseError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -50,8 +41,8 @@ impl<'a> Iterator for CookieIter<'a> {
 
         if let Some(cook) = self.iter.by_ref().next() {
             let cook = percent_decode(cook.as_bytes());
-            let cook = cook.decode_utf8().map_err(|error| cookie::ParseError::Utf8Error(error))
-                                         .and_then(|cook| cookie::Cookie::parse(cook));
+            let cook = cook.decode_utf8().map_err(|error| cookie2::ParseError::Utf8Error(error))
+                                         .and_then(|cook| cookie2::Cookie::parse(cook));
             Some(cook)
         } else {
             None

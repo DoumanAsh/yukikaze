@@ -6,12 +6,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::header;
 
-use etag;
-use mime;
-use cookie;
-use hyper;
 use serde::de::DeserializeOwned;
-use httpdate;
 
 pub(crate) type HyperResponse = hyper::Response<hyper::Body>;
 
@@ -158,8 +153,8 @@ impl Response {
 
     #[inline]
     ///Creates jar from cookies in response.
-    pub fn cookies_jar(&self) -> Result<cookie::CookieJar, cookie::ParseError> {
-        let mut jar = cookie::CookieJar::new();
+    pub fn cookies_jar(&self) -> Result<cookie2::CookieJar, cookie2::ParseError> {
+        let mut jar = cookie2::CookieJar::new();
 
         for cook in self.cookies_iter() {
             jar.add(cook?.into_owned());
@@ -170,7 +165,7 @@ impl Response {
 
     #[inline]
     ///Retrieves all cookies from `Set-Cookie` headers.
-    pub fn cookies(&self) -> Result<Vec<cookie::Cookie<'static>>, cookie::ParseError> {
+    pub fn cookies(&self) -> Result<Vec<cookie2::Cookie<'static>>, cookie2::ParseError> {
         let mut cookies = Vec::new();
 
         for cook in self.cookies_iter() {

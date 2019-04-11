@@ -109,7 +109,7 @@ impl Into<HyperRequest> for Request {
 ///panic.
 pub struct Builder {
     parts: http::request::Parts,
-    cookies: Option<cookie::CookieJar>,
+    cookies: Option<cookie2::CookieJar>,
 }
 
 impl Builder {
@@ -205,7 +205,7 @@ impl Builder {
     ///
     ///If jar already exists, the cookies from jar
     ///are appended.
-    pub fn set_cookie_jar(mut self, jar: cookie::CookieJar) -> Self {
+    pub fn set_cookie_jar(mut self, jar: cookie2::CookieJar) -> Self {
         if self.cookies.is_none() {
             self.cookies = Some(jar);
         } else {
@@ -220,9 +220,9 @@ impl Builder {
     }
 
     ///Adds cookie.
-    pub fn add_cookie(mut self, cookie: cookie::Cookie<'static>) -> Self {
+    pub fn add_cookie(mut self, cookie: cookie2::Cookie<'static>) -> Self {
         if self.cookies.is_none() {
-            let mut jar = cookie::CookieJar::new();
+            let mut jar = cookie2::CookieJar::new();
             jar.add(cookie);
             self.cookies = Some(jar);
         } else {

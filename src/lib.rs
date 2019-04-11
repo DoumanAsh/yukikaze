@@ -69,7 +69,7 @@
 pub extern crate serde;
 pub extern crate serde_json;
 pub extern crate serde_urlencoded;
-pub extern crate cookie;
+pub extern crate cookie2;
 pub extern crate percent_encoding;
 pub extern crate http;
 pub extern crate httpdate;
@@ -86,6 +86,8 @@ pub extern crate bytes;
 pub extern crate flate2;
 #[cfg(feature = "encoding")]
 pub extern crate encoding_rs;
+
+pub use cookie2 as cookie;
 
 #[macro_use]
 mod utils;

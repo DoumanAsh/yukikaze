@@ -1,16 +1,10 @@
-extern crate yukikaze;
-extern crate tokio;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate etag;
-extern crate percent_encoding;
-extern crate cookie;
 
-use ::std::fs;
-use ::std::io;
-use ::std::io::Seek;
-use ::std::time;
+use std::fs;
+use std::io;
+use std::io::Seek;
+use std::time;
 
 use yukikaze::http;
 use yukikaze::client;
@@ -406,7 +400,7 @@ fn test_cookie() {
     assert_eq!(cookie.name(), KEY);
     assert_eq!(cookie.value(), VALUE);
 
-    let extra_cookie = cookie::Cookie::build("First", "Mehisha").path("/").http_only(true).finish();
+    let extra_cookie = cookie2::Cookie::build("First", "Mehisha").path("/").http_only(true).finish();
     let request = client::request::Request::get(BIN_COOKIE).expect("Error with request!").add_cookie(cookie.into_owned()).add_cookie(extra_cookie).empty();
     println!("request={:?}", request);
     let response = rt.block_on(client.execute(request)).expect("Error with response!");
