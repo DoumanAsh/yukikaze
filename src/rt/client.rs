@@ -88,7 +88,7 @@ impl Drop for GlobalClient {
 
                 Box::from_raw(self.inner as *const HttpClient as *mut HttpClient);
             },
-            _ => panic!("Client is not set, but dropping global guard!")
+            _ => panic!("Client is not set, while dropping global guard!")
         }
     }
 }

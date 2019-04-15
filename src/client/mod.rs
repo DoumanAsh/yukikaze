@@ -37,12 +37,13 @@ use crate::header;
 use hyper;
 use hyper_rustls;
 
-use std::fmt;
+use std::{fmt};
 use std::marker::PhantomData;
 
 type HyperClient = hyper::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
 
 pub mod config;
+pub mod upgrade;
 pub mod request;
 pub mod response;
 
@@ -117,16 +118,21 @@ impl<C: config::Config> HttpClient for Client<C> {
     fn execute(&self, mut request: request::Request) -> response::Future {
         Self::apply_headers(&mut request);
 
-        response::FutureResponse::new(self.inner.request(request.into()), C::timeout())
+        let params = response::FutureResponseParams::from_request(&mut request);
+
+        response::FutureResponse::new(self.inner.request(request.into()), C::timeout(), params)
     }
 
     #[cfg(feature = "rt-client")]
     fn with_redirect(&self, mut request: request::Request) -> response::RedirectFuture {
         Self::apply_headers(&mut request);
+
+        let params = response::FutureResponseParams::from_request(&mut request);
+
         let cache = response::redirect::Cache::new(&request);
         let future = response::redirect::HyperRedirectFuture::new(self.inner.request(request.into()), cache, C::max_redirect_num());
 
-        response::RedirectFuture::new(future, C::timeout())
+        response::RedirectFuture::new(future, C::timeout(), params)
     }
 
     fn execute_raw_hyper(&self, request: HyperRequest) -> hyper::client::ResponseFuture {

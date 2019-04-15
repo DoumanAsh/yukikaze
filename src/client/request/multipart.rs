@@ -121,11 +121,10 @@ impl Form {
 
 #[cfg(test)]
 mod tests {
-    use ::mime::TEXT_PLAIN;
-    use ::std::str;
-    use ::std::fs;
-    use ::std::io::Read;
     use super::Form;
+    use mime::TEXT_PLAIN;
+    use std::{fs, str};
+    use std::io::Read;
 
     #[test]
     fn multipart_form_add_simple_field() {

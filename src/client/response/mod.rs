@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::ops::{Deref, DerefMut};
 
 use crate::header;
+use super::upgrade;
 
 use serde::de::DeserializeOwned;
 
@@ -19,6 +20,7 @@ mod future;
 ///Redirect support module.
 pub(crate) mod redirect;
 
+pub(crate) use self::future::FutureResponseParams;
 pub use self::future::FutureResponse;
 #[cfg(feature = "rt-client")]
 pub use self::redirect::HyperRedirectFuture;
@@ -32,10 +34,16 @@ pub type RedirectFuture = FutureResponse<redirect::HyperRedirectFuture>;
 #[derive(Debug)]
 ///HTTP Response
 pub struct Response {
-    inner: HyperResponse,
+    pub(crate) inner: HyperResponse,
 }
 
 impl Response {
+    #[inline]
+    ///Retrieves status code
+    pub fn status(&self) -> http::StatusCode {
+        self.inner.status()
+    }
+
     #[inline]
     ///Returns whether Response's status is informational.
     ///
@@ -82,6 +90,30 @@ impl Response {
     ///The response status code is in range 500 to 599
     pub fn is_internal_error(&self) -> bool {
         self.inner.status().is_client_error()
+    }
+
+    #[inline]
+    ///Returns whether Response's status indicates upgrade
+    pub fn is_upgrade(&self) -> bool {
+        self.inner.status() == http::StatusCode::SWITCHING_PROTOCOLS
+    }
+
+    #[inline]
+    ///Retrieves reference to http extension map
+    pub fn extensions(&self) -> &http::Extensions {
+        self.inner.extensions()
+    }
+
+    #[inline]
+    ///Retrieves mutable reference to http extension map
+    pub fn extensions_mut(&mut self) -> &mut http::Extensions {
+        self.inner.extensions_mut()
+    }
+
+    #[inline]
+    ///Access response's headers
+    pub fn headers(&self) -> &http::HeaderMap {
+        self.inner.headers()
     }
 
     #[inline]
@@ -223,6 +255,11 @@ impl Response {
         }
 
         extractor::FileBody::new(self, file, extractor::notify::Noop)
+    }
+
+    ///Prepares upgrade for the request.
+    pub fn upgrade<U: upgrade::Upgrade>(self, _: U) -> U::Result {
+        U::upgrade_response(self)
     }
 }
 
