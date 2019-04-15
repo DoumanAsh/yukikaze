@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP client library."
 readme = "README.md"
@@ -51,7 +51,7 @@ tokio = { version = "0.1", optional = true, default-features = false, features =
 derive_more = "0.14"
 
 [package.metadata.docs.rs]
-features = ["flate2-c", "encoding", "rt", "webscoket"]
+features = ["flate2-c", "encoding", "rt", "websocket"]
 
 [features]
 default = ["flate2-c"]
