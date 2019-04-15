@@ -3,6 +3,7 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::string;
+use std::error::Error;
 
 use tokio_timer;
 use mime;
@@ -12,29 +13,17 @@ use serde_json;
 use super::FutureResponse;
 
 ///Describes errors related to content type.
-#[derive(Debug)]
+#[derive(Debug, derive_more::From, derive_more::Display)]
 pub enum ContentTypeError {
+    #[display(fmt = "Failed to parse Mime: {}", "_0")]
     ///Mime parsing error.
     Mime(mime::FromStrError),
+    #[display(fmt = "Unable to recognize encoding")]
     ///Unknown encoding of Content-Type.
     UnknownEncoding,
 }
 
-impl fmt::Display for ContentTypeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &ContentTypeError::Mime(ref error) => write!(f, "Failed to parse Mime: {}", error),
-            &ContentTypeError::UnknownEncoding => write!(f, "Unable to recognize encoding")
-        }
-    }
-}
-
-impl From<mime::FromStrError> for ContentTypeError {
-    #[inline]
-    fn from(error: mime::FromStrError) -> Self {
-        ContentTypeError::Mime(error)
-    }
-}
+impl Error for ContentTypeError {}
 
 #[derive(Debug)]
 ///Represents failed due to timeout request.
@@ -44,11 +33,11 @@ impl From<mime::FromStrError> for ContentTypeError {
 ///but you don't want to set too high timeout value for your
 ///client you can rely on it to continue your request.
 pub struct Timeout<F> {
-    inner: F
+    inner: (F, super::FutureResponseParams)
 }
 
 impl<F> Timeout<F> {
-    pub(crate) fn new(inner: F) -> Self {
+    pub(crate) fn new(inner: (F, super::FutureResponseParams)) -> Self {
         Self {
             inner
         }
@@ -56,17 +45,20 @@ impl<F> Timeout<F> {
 
     ///Starts request again with new timeout.
     pub fn retry(self, timeout: time::Duration) -> FutureResponse<F> {
-        FutureResponse::new(self.inner, timeout)
+        FutureResponse::new(self.inner.0, timeout, self.inner.1)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display)]
 ///Describes possible response errors.
 pub enum ResponseError<F> {
+    #[display(fmt = "Request timed out.")]
     ///Response failed due to timeout.
     Timeout(Timeout<F>),
+    #[display(fmt = "IO timer error happened while executing request: {}", "_0")]
     ///Hyper Error.
     HyperError(hyper::error::Error),
+    #[display(fmt = "Request failed due to HTTP error: {}", "_0")]
     ///Tokio timer threw error.
     Timer(tokio_timer::Error, Timeout<F>)
 }
@@ -91,31 +83,30 @@ impl<F> From<hyper::error::Error> for ResponseError<F> {
     }
 }
 
-impl<F> fmt::Display for ResponseError<F> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &ResponseError::Timeout(_) => write!(f, "Request timed out."),
-            &ResponseError::Timer(ref error, _) => write!(f, "IO timer error happened while executing request: {}", error),
-            &ResponseError::HyperError(ref error) => write!(f, "Request failed due to HTTP error: {}", error)
-        }
-    }
-}
+impl<F: fmt::Debug> Error for ResponseError<F> {}
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display)]
 ///Describes possible errors when reading body.
 pub enum BodyReadError {
+    #[display(fmt = "Failed to read due to HTTP error: {}", "_0")]
     ///Hyper's error.
     Hyper(hyper::Error),
+    #[display(fmt = "Read limit is reached. Aborted reading.")]
     ///Hit limit
     Overflow,
+    #[display(fmt = "Unable to decode content into UTF-8")]
     ///Unable to decode body as UTF-8
     EncodingError,
+    #[display(fmt = "Failed to extract JSON. Error: {}", "_0")]
     ///Json serialization error.
     JsonError(serde_json::error::Error),
+    #[display(fmt = "Failed to decompress(deflate) content. Error: {}", "_0")]
     ///Error happened during deflate decompression.
     DeflateError(io::Error),
+    #[display(fmt = "Failed to decompress(gzip) content. Error: {}", "_0")]
     ///Error happened during gzip decompression.
     GzipError(io::Error),
+    #[display(fmt = "Error file writing response into file. Error: {}", "_1")]
     ///Error happened when writing to file.
     FileError(fs::File, io::Error),
 }
@@ -141,16 +132,4 @@ impl From<hyper::Error> for BodyReadError {
     }
 }
 
-impl fmt::Display for BodyReadError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &BodyReadError::Hyper(ref error) => write!(f, "Failed to read due to HTTP error: {}", error),
-            &BodyReadError::Overflow => write!(f, "Read limit is reached. Aborted reading."),
-            &BodyReadError::EncodingError => write!(f, "Unable to decode content into UTF-8"),
-            &BodyReadError::JsonError(ref error) => write!(f, "Failed to extract JSON. Error: {}", error),
-            &BodyReadError::DeflateError(ref error) => write!(f, "Failed to decompress content. Error: {}", error),
-            &BodyReadError::GzipError(ref error) => write!(f, "Failed to decompress content. Error: {}", error),
-            &BodyReadError::FileError(_, ref error) => write!(f, "Error file writing response into file. Error: {}", error),
-        }
-    }
-}
+impl Error for BodyReadError {}

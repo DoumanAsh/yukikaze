@@ -1,8 +1,7 @@
 //!Request primitives.
 
-use std::mem;
 use std::io::Write;
-use std::fmt;
+use std::{mem, fmt};
 
 use data_encoding::BASE64;
 use bytes::BufMut;
@@ -12,6 +11,7 @@ use serde_urlencoded;
 use http::HttpTryFrom;
 use http::header::HeaderValue;
 
+use super::upgrade;
 use crate::header;
 use crate::utils;
 
@@ -94,6 +94,26 @@ impl Request {
     pub fn uri_mut(&mut self) -> &mut http::Uri {
         &mut self.parts.uri
     }
+
+    #[inline]
+    ///Retrieves reference to http extension map
+    pub fn extensions(&self) -> &http::Extensions {
+        &self.parts.extensions
+    }
+
+    #[inline]
+    ///Retrieves mutable reference to http extension map
+    pub fn extensions_mut(&mut self) -> &mut http::Extensions {
+        &mut self.parts.extensions
+    }
+
+    #[inline]
+    ///Extracts extensions out and leaves empty in `Self`
+    pub fn extract_extensions(&mut self) -> http::Extensions {
+        let mut extensions = http::Extensions::new();
+        mem::swap(&mut extensions, self.extensions_mut());
+        extensions
+    }
 }
 
 impl Into<HyperRequest> for Request {
@@ -131,9 +151,31 @@ impl Builder {
     }
 
     #[inline]
+    ///Retrieves reference to http extension map
+    pub fn extensions(&self) -> &http::Extensions {
+        &self.parts.extensions
+    }
+
+    #[inline]
+    ///Retrieves mutable reference to http extension map
+    pub fn extensions_mut(&mut self) -> &mut http::Extensions {
+        &mut self.parts.extensions
+    }
+
+    #[inline]
     ///Gets reference to headers.
     pub fn headers(&mut self) -> &mut http::HeaderMap {
         &mut self.parts.headers
+    }
+
+    #[inline]
+    ///Invokes closure with `value` and `Self` as arguments, if `value` contains something
+    ///
+    pub fn if_some<T, F: FnOnce(T, Self) -> Self>(self, value: Option<T>, cb: F) -> Self {
+        match value {
+            Some(value) => cb(value, self),
+            None => self,
+        }
     }
 
     #[inline]
@@ -327,6 +369,15 @@ impl Builder {
             Err(error) => panic!("Unable to set query for URI: {}", error)
         };
         self
+    }
+
+    ///Prepares upgrade for the request.
+    ///
+    ///Existing mechanisms:
+    ///
+    ///- [Websocket](../upgrade/websocket/index.html)
+    pub fn upgrade<U: upgrade::Upgrade>(self, _: U, options: U::Options) -> Request {
+        U::prepare_request(self, options)
     }
 
     ///Creates request with specified body.

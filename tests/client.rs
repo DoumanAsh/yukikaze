@@ -414,6 +414,28 @@ fn test_cookie() {
     assert_eq!(res.cookies.first, "Mehisha");
 }
 
+#[cfg(feature = "websocket")]
+#[test]
+fn test_websocket_upgrade() {
+    const WS_TEST: &str = "http://echo.websocket.org/?encoding=text";
+
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+
+    let request = client::request::Request::get(WS_TEST).expect("Error with request!")
+                                                        .upgrade(client::upgrade::WebsocketUpgrade, None);
+
+    let response = rt.block_on(client.execute(request)).expect("Error with response!");
+    if !response.is_upgrade() {
+        println!("body={}", rt.block_on(response.text()).expect("To get body"));
+        panic!("Expected upgrade");
+    }
+
+    let upgrade = response.upgrade(client::upgrade::WebsocketUpgrade).expect("To validate upgrade");
+    let (response, _) = rt.block_on(upgrade).expect("To finish upgrade");
+    assert!(response.is_upgrade());
+}
+
 #[cfg(feature = "encoding")]
 #[test]
 fn decode_non_utf8() {

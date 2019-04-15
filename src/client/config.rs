@@ -94,5 +94,4 @@ pub trait Config {
 ///Uses default [Config](trait.Config.html) impl.
 pub struct DefaultCfg;
 
-impl Config for DefaultCfg {
-}
+impl Config for DefaultCfg {}
