@@ -9,8 +9,5 @@ test:cargo:
         - cargo check
         - cargo check --features websocket
         - cargo check --features encoding
-        - cargo check --features rt-tokio
-        - cargo check --features rt-client
-        - cargo check --features rt,rt-tokio-multi
-        - cargo test test_global_client --features rt,rt-tokio-multi
+        - cargo check --features rt
         - cargo test --features encoding,rt,websocket

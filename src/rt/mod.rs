@@ -3,14 +3,25 @@
 //!Yukikaze-sama is benevolent soul and it pains her when you cannot be lazy.
 //!As such you can use this module to simplify your workflow.
 //!
+//!## Dependencies:
+//!
+//!```toml
+//![dependencies]
+//!tokio-global = { version = "0.2", features = ["single"] }
+//!yukikaze = { version = "0.8", features = ["rt"] }
+//!```
+//!
 //!## Example
+//!
 //!
 //!```rust
 //!extern crate yukikaze;
+//!extern crate tokio_global; //external dependency
 //!use yukikaze::client;
-//!use yukikaze::rt::{AutoClient, AutoRuntime, init};
+//!use yukikaze::rt::{AutoClient};
+//!use tokio_global::AutoRuntime;
 //!
-//!let _guard = init();
+//!let _guard = tokio_global::single::init();
 //!//Now we can exeute futures using runtime
 //!//When guard goes out of scope though,
 //!//we no longer can use it.
@@ -29,27 +40,7 @@
 
 #[cfg(feature = "rt-client")]
 pub mod client;
-#[cfg(all(feature = "rt-tokio", not(feature = "rt-tokio-multi")))]
-pub mod tokio;
-#[cfg(feature = "rt-tokio-multi")]
-pub mod tokio_multi;
-
-///Trait to bootstrap your futures.
-pub trait AutoRuntime: futures::Future {
-    ///Runs futures to competition.
-    ///
-    ///Yukikaze-sama uses global runtime to work on your futures
-    ///
-    ///## Note
-    ///
-    ///It must not be used from within async context
-    fn finish(self) -> Result<Self::Item, Self::Error>;
-}
-
-#[cfg(feature = "rt-tokio-multi")]
-pub use tokio_multi as tokio;
 
 #[cfg(feature = "rt-client")]
 pub use self::client::{GlobalClient, AutoClient};
-#[cfg(any(feature = "rt-tokio", feature = "rt-tokio-multi"))]
-pub use self::tokio::{init};
+

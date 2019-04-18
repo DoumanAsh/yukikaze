@@ -466,9 +466,10 @@ fn test_global_client() {
     const BIN_REL_REDIRECT_2: &'static str = "http://httpbin.org/redirect/2";
     const BIN_ABS_REDIRECT_3: &'static str = "http://httpbin.org/absolute-redirect/3";
 
-    use yukikaze::rt::{AutoRuntime, AutoClient, init};
+    use tokio_global::AutoRuntime;
+    use yukikaze::rt::{AutoClient};
 
-    let _guard = init();
+    let _guard = tokio_global::single::init();
 
     {
         let _global = yukikaze::rt::GlobalClient::with_config::<SmolRedirect>();
@@ -496,15 +497,4 @@ fn test_global_client() {
         //Try to init it second time
         let _global = yukikaze::rt::GlobalClient::with_config::<SmolRedirect>();
     }
-}
-
-#[cfg(feature = "rt")]
-#[should_panic]
-#[test]
-fn test_global_client_not_set() {
-    use yukikaze::rt::{AutoRuntime, AutoClient};
-    let request = client::request::Request::get(BIN_URL).expect("To create get request").empty();
-
-    let result = request.send().finish();
-    println!("result={:?}", result);
 }

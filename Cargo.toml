@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP client library."
 readme = "README.md"
@@ -46,7 +46,6 @@ serde_urlencoded = "0.5"
 
 rand = { version = "0.6", optional = true }
 flate2 = { version = "^1.0.2", optional = true, default-features = false }
-tokio = { version = "0.1", optional = true, default-features = false, features = ["rt-full"] }
 
 derive_more = "0.14"
 
@@ -65,18 +64,11 @@ websocket = ["rand", "carry_extensions"]
 # Enables encoding/decoding of text content
 encoding = ["encoding_rs"]
 
-# Enables tokio runtime module
-rt-tokio = ["tokio"]
-
-# Enable multi-threaded tokio runtime
-# Overrides rt-tokio
-rt-tokio-multi = ["tokio"]
-
 # Enables client runtime module
 rt-client = []
 
 # Enables runtime
-rt = ["rt-tokio", "rt-client"]
+rt = ["rt-client"]
 
 # miniz-sys backend for flate2 crate
 flate2-c = ["flate2/miniz-sys"]
@@ -87,3 +79,4 @@ flate2-rust = ["flate2/rust_backend"]
 [dev-dependencies]
 serde_derive = "1"
 tokio = { version = "0.1", default-features = false, features = ["rt-full"] }
+tokio-global = { version = "0.2", features = ["single"] }

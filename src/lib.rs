@@ -7,10 +7,8 @@
 //!- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default on.
 //!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default off.
 //!- `encoding` - Enables encoding crate support. Default off.
-//!- `rt-tokio` - Enables tokio runtime module. Default off.
-//!- `rt-tokio-multi` - Enables multi-threaded tokio runtime. Overrides `rt-tokio`. Default off.
 //!- `rt-client` - Enables Yukikaze client runtime module. Default off.
-//!- `rt` - Enables `rt-tokio` and `rt-client`. Default off.
+//!- `rt` - Enables `rt-client`. Default off.
 //!- `websocket` - Enables Websocket Upgrade mechanism. Default off. Enables `carry_extensions` when `on`.
 //!- `carry_extensions` - Carries `http::Extensions` from request to resolved `Response`. Default off.
 //!
