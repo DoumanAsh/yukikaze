@@ -1,8 +1,18 @@
-use std::mem;
+use core::mem;
 use std::io::{self, Write};
 
 const DEFAULT_CAPACITY: usize = 4096;
 const SMOL_CAPCITY: usize = 64;
+
+#[macro_export]
+///Await future in async context.
+///
+///Because `.await` is retarded.
+macro_rules! awaitic {
+    ($exp:expr) => {
+        ($exp).await
+    }
+}
 
 #[doc(hidden)]
 #[macro_export]
@@ -23,6 +33,8 @@ macro_rules! unreach {
         unreachable!()
     })
 }
+
+//pub mod fut;
 
 pub(crate) struct BytesWriter {
     buf: bytes::BytesMut,

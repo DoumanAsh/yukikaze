@@ -1,7 +1,8 @@
 use percent_encoding::{percent_encode, PATH_SEGMENT_ENCODE_SET, percent_decode, EncodeSet};
 
-use std::fmt;
-use std::str::FromStr;
+use core::fmt;
+use core::str::FromStr;
+
 use std::error::Error;
 
 #[derive(Debug)]

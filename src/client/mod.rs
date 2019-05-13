@@ -1,72 +1,27 @@
 //!Client module
-//!
-//!Yukikaze-sama's HTTP Client is plain wrapper over hyper's client.
-//!In order to configure it user should use [Config](config/trait.Config.html)
-//!
-//!## Providing configuration
-//!
-//!```rust
-//!extern crate yukikaze;
-//!
-//!use yukikaze::client;
-//!use yukikaze::client::config::{Config, DefaultCfg};
-//!
-//!use std::time::Duration;
-//!
-//!struct Conf;
-//!
-//!impl Config for Conf {
-//!    fn timeout() -> Duration {
-//!        Duration::from_secs(10)
-//!    }
-//!
-//!    fn default_headers(request: &mut client::Request) {
-//!        DefaultCfg::default_headers(request);
-//!        //We can set Yukikaze-sama default headers
-//!        //and our own!
-//!    }
-//!}
-//!
-//!let _client = client::Client::<Conf>::new();
-//!//Use client now
-//!
-//!```
+use hyper::client::connect::Connect;
+use futures_util::future::FutureExt;
+
+use core::marker::PhantomData;
+use core::future::Future;
+use core::fmt;
+use std::path::Path;
 
 use crate::header;
 
-use hyper;
-use hyper_rustls;
-
-use std::{fmt};
-use std::marker::PhantomData;
-
-type HyperClient = hyper::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
-
 pub mod config;
-pub mod upgrade;
 pub mod request;
 pub mod response;
 
-use self::request::HyperRequest;
-
-pub use self::request::Request;
-
-///Describes HTTP Client functionality
-pub trait HttpClient {
-    ///Starts sending HTTP request.
-    fn execute(&self, request: request::Request) -> response::Future;
-    #[cfg(feature = "rt-client")]
-    ///Starts sending HTTP request with redirect support.
-    ///
-    ///Available only when `rt-client` is enabled.
-    fn with_redirect(&self, request: request::Request) -> response::RedirectFuture;
-    ///Executes raw hyper request and returns its future.
-    fn execute_raw_hyper(&self, request: HyperRequest) -> hyper::client::ResponseFuture;
-}
+pub use request::Request;
+pub use response::Response;
 
 ///HTTP Client
-pub struct Client<C=config::DefaultCfg> {
-    inner: HyperClient,
+pub struct Client<C=config::DefaultCfg> where C: config::Config, C: 'static,
+//TODO: This shit should be removed once trait bounds for associated types will allow where clauses
+<C::Connector as Connect>::Future: 'static, <C::Connector as Connect>::Transport: 'static
+{
+    inner: hyper::Client<C::Connector>,
     _config: PhantomData<C>
 }
 
@@ -83,13 +38,14 @@ impl<C: config::Config> fmt::Debug for Client<C> {
     }
 }
 
+type RequestResult = Result<response::Response, hyper::Error>;
+
 impl<C: config::Config> Client<C> {
     ///Creates new instance of client with specified configuration.
     ///
     ///Use `Default` if you'd like to use [default](config/struct.DefaultCfg.html) config.
     pub fn new() -> Client<C> {
-        let https = hyper_rustls::HttpsConnector::new(C::dns_threads());
-        let inner = C::config_hyper(&mut hyper::Client::builder()).build(https);
+        let inner = C::config_hyper(&mut hyper::Client::builder()).build(C::new_connector());
 
         Self {
             inner,
@@ -112,30 +68,124 @@ impl<C: config::Config> Client<C> {
             }
         }
     }
-}
 
-impl<C: config::Config> HttpClient for Client<C> {
-    fn execute(&self, mut request: request::Request) -> response::Future {
-        Self::apply_headers(&mut request);
+    ///Sends request, and returns response
+    pub async fn request(&self, mut req: request::Request) -> RequestResult {
+        Self::apply_headers(&mut req);
 
-        let params = response::FutureResponseParams::from_request(&mut request);
+        let ongoing = self.inner.request(req.into());
+        let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
 
-        response::FutureResponse::new(self.inner.request(request.into()), C::timeout(), params)
+        awaitic!(ongoing)
     }
 
-    #[cfg(feature = "rt-client")]
-    fn with_redirect(&self, mut request: request::Request) -> response::RedirectFuture {
-        Self::apply_headers(&mut request);
+    ///Sends request and returns response. Timed version.
+    ///
+    ///On timeout error it returns `async_timer::timed::Expired` as `Error`
+    ///`Expired` implements `Future` that can be used to re-spawn ongoing request again.
+    ///
+    ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
+    ///variant.
+    pub async fn send(&self, mut req: request::Request) -> Result<RequestResult, async_timer::timed::Expired<impl Future<Output=RequestResult>, C::Timer>> {
+        Self::apply_headers(&mut req);
 
-        let params = response::FutureResponseParams::from_request(&mut request);
+        let ongoing = self.inner.request(req.into());
+        let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
 
-        let cache = response::redirect::Cache::new(&request);
-        let future = response::redirect::HyperRedirectFuture::new(self.inner.request(request.into()), cache, C::max_redirect_num());
-
-        response::RedirectFuture::new(future, C::timeout(), params)
+        let timeout = C::timeout();
+        match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
+            true => Ok(awaitic!(ongoing)),
+            false => {
+                let job = async_timer::Timed::<_, C::Timer>::new(ongoing, timeout);
+                awaitic!(job)
+            }
+        }
     }
 
-    fn execute_raw_hyper(&self, request: HyperRequest) -> hyper::client::ResponseFuture {
-        self.inner.request(request)
+    ///Sends request and returns response, while handling redirects.
+    pub async fn redirect_request(&self, mut req: request::Request) -> RequestResult {
+        use http::{Method, StatusCode};
+
+        Self::apply_headers(&mut req);
+
+        let mut rem_redirect = C::max_redirect_num();
+
+        let mut method = req.parts.method.clone();
+        let uri = req.parts.uri.clone();
+        let mut headers = req.parts.headers.clone();
+        let mut body = req.body.clone();
+
+        loop {
+            let res = awaitic!(self.request(req))?;
+
+            match res.status() {
+                StatusCode::SEE_OTHER => {
+                    rem_redirect -= 1;
+                    match rem_redirect {
+                        0 => return Ok(res),
+                        _ => {
+                            //All requests should be changed to GET with no body.
+                            //In most cases it is result of successful POST.
+                            body = None;
+                            method = Method::GET;
+                        }
+                    }
+                },
+                StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND | StatusCode::TEMPORARY_REDIRECT | StatusCode::PERMANENT_REDIRECT => {
+                    rem_redirect -= 1;
+                    match rem_redirect {
+                        0 => return Ok(res),
+                        _ => (),
+                    }
+                }
+                _ => return Ok(res),
+            }
+
+            let location = match res.headers().get(header::LOCATION).and_then(|loc| loc.to_str().ok()).and_then(|loc| loc.parse::<hyper::Uri>().ok()) {
+                Some(loc) => match loc.scheme_part().is_some() {
+                    //We assume that if scheme is present then it is absolute redirect
+                    true => {
+                        //Well, it is unlikely that host would be empty, but just in case, right?
+                        if let Some(prev_host) = uri.authority_part().map(|part| part.host()) {
+                            match loc.authority_part().map(|part| part.host() == prev_host).unwrap_or(false) {
+                                true => (),
+                                false => {
+                                    headers.remove("authorization");
+                                    headers.remove("cookie");
+                                    headers.remove("cookie2");
+                                    headers.remove("www-authenticate");
+                                }
+                            }
+                        }
+
+                        loc
+                    },
+                    //Otherwise it is relative to current location.
+                    false => {
+                        let current = Path::new(uri.path());
+                        let loc = Path::new(loc.path());
+                        let loc = current.join(loc);
+                        let loc = loc.to_str().expect("Valid UTF-8 path").parse::<hyper::Uri>().expect("Valid URI");
+                        let mut loc_parts = loc.into_parts();
+
+                        loc_parts.scheme = uri.scheme_part().cloned();
+                        loc_parts.authority = uri.authority_part().cloned();
+
+                        hyper::Uri::from_parts(loc_parts).expect("Create redirect URI")
+                    },
+                },
+                None => return Ok(res),
+            };
+
+            let (mut parts, _) = hyper::Request::<()>::new(()).into_parts();
+            parts.method = method.clone();
+            parts.uri = location;
+            parts.headers = headers.clone();
+
+            req = request::Request {
+                parts,
+                body: body.clone()
+            };
+        }
     }
 }

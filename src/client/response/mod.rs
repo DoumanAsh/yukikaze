@@ -1,43 +1,32 @@
-//!Response primitives.
+//! Response module.
 
+use core::ops::{Deref, DerefMut};
+use core::str::FromStr;
+use core::future::Future;
+use core::mem;
 use std::fs;
-use std::str::FromStr;
-use std::ops::{Deref, DerefMut};
 
-use crate::header;
-use super::upgrade;
+use crate::{extractor, header};
 
-use serde::de::DeserializeOwned;
+pub mod errors;
 
 pub(crate) type HyperResponse = hyper::Response<hyper::Body>;
-
-///Response errors.
-pub mod errors;
-///Extractor module.
-pub mod extractor;
-mod future;
-#[cfg(feature = "rt-client")]
-///Redirect support module.
-pub(crate) mod redirect;
-
-pub(crate) use self::future::FutureResponseParams;
-pub use self::future::FutureResponse;
-#[cfg(feature = "rt-client")]
-pub use self::redirect::HyperRedirectFuture;
-
-///Yukikaze-sama's regular future response.
-pub type Future = FutureResponse<hyper::client::ResponseFuture>;
-#[cfg(feature = "rt-client")]
-///Yukikaze-sama's future response with redirect support.
-pub type RedirectFuture = FutureResponse<redirect::HyperRedirectFuture>;
 
 #[derive(Debug)]
 ///HTTP Response
 pub struct Response {
-    pub(crate) inner: HyperResponse,
+    inner: HyperResponse,
 }
 
 impl Response {
+    #[inline]
+    ///Creates new instance from existing hyper response.
+    pub fn new(hyper: HyperResponse) -> Self {
+        Self {
+            inner: hyper
+        }
+    }
+
     #[inline]
     ///Retrieves status code
     pub fn status(&self) -> http::StatusCode {
@@ -148,7 +137,7 @@ impl Response {
 
     #[inline]
     ///Retrieves length of content to receive, if `Content-Length` exists.
-    pub fn content_len(&self) -> Option<u64> {
+    pub fn content_len(&self) -> Option<usize> {
         self.inner.headers()
                   .get(header::CONTENT_LENGTH)
                   .and_then(|header| header.to_str().ok())
@@ -185,8 +174,8 @@ impl Response {
 
     #[inline]
     ///Creates jar from cookies in response.
-    pub fn cookies_jar(&self) -> Result<cookie2::CookieJar, cookie2::ParseError> {
-        let mut jar = cookie2::CookieJar::new();
+    pub fn cookies_jar(&self) -> Result<cookie::CookieJar, cookie::ParseError> {
+        let mut jar = cookie::CookieJar::new();
 
         for cook in self.cookies_iter() {
             jar.add(cook?.into_owned());
@@ -197,7 +186,7 @@ impl Response {
 
     #[inline]
     ///Retrieves all cookies from `Set-Cookie` headers.
-    pub fn cookies(&self) -> Result<Vec<cookie2::Cookie<'static>>, cookie2::ParseError> {
+    pub fn cookies(&self) -> Result<Vec<cookie::Cookie<'static>>, cookie::ParseError> {
         let mut cookies = Vec::new();
 
         for cook in self.cookies_iter() {
@@ -223,43 +212,71 @@ impl Response {
                             .and_then(|header| header.trim().parse().ok())
     }
 
-    #[inline]
-    ///Extracts body as raw bytes.
-    pub fn body(self) -> extractor::RawBody<extractor::notify::Noop> {
-        extractor::RawBody::new(self, extractor::notify::Noop)
+    #[inline(always)]
+    fn extract_body(&mut self) -> (header::ContentEncoding, Option<usize>, hyper::Body) {
+        let encoding = self.content_encoding();
+        let buffer_size = self.content_len();
+        let mut body = hyper::Body::empty();
+
+        mem::swap(&mut body, self.inner.body_mut());
+
+        (encoding, buffer_size, body)
     }
 
-    #[inline]
-    ///Extracts body as UTF-8 String
-    pub fn text(self) -> extractor::Text<extractor::notify::Noop> {
-        extractor::Text::new(self, extractor::notify::Noop)
+    ///Extracts Response's body as raw bytes.
+    pub fn body(&mut self) -> impl Future<Output=Result<bytes::Bytes, extractor::BodyReadError>> {
+        let (encoding, buffer_size, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        extractor::raw_bytes(body, encoding, buffer_size)
     }
 
-    #[inline]
-    ///Extracts body as JSON
-    pub fn json<J: DeserializeOwned>(self) -> extractor::Json<J, extractor::notify::Noop> {
-        extractor::Json::new(self, extractor::notify::Noop)
+    ///Extracts Response's body as text
+    pub fn text(&mut self) -> impl Future<Output=Result<String, extractor::BodyReadError>> {
+        let (encoding, buffer_size, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        #[cfg(feature = "encoding")]
+        {
+            let charset = self.charset_encoding().unwrap_or(encoding_rs::UTF_8);
+            extractor::text_charset(body, encoding, buffer_size, charset)
+        }
+
+        #[cfg(not(feature = "encoding"))]
+        {
+            extractor::text(body, encoding, buffer_size)
+        }
     }
 
-    #[inline]
-    ///Extracts body to file.
-    ///
-    ///# Panics
-    ///
-    ///- If file is read-only. Checked only when debug assertions are on.
-    pub fn file(self, file: fs::File) -> extractor::FileBody<extractor::notify::Noop> {
+    ///Extracts Response's body as JSON
+    pub fn json<J: serde::de::DeserializeOwned>(&mut self) -> impl Future<Output=Result<J, extractor::BodyReadError>> {
+        let (encoding, buffer_size, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        #[cfg(feature = "encoding")]
+        {
+            let charset = self.charset_encoding().unwrap_or(encoding_rs::UTF_8);
+            extractor::json_charset(body, encoding, buffer_size, charset)
+        }
+
+        #[cfg(not(feature = "encoding"))]
+        {
+            extractor::json(body, encoding, buffer_size)
+        }
+    }
+
+    ///Extracts Response's body into file
+    pub fn file(&mut self, file: fs::File) -> impl Future<Output=Result<fs::File, extractor::BodyReadError>> {
         #[cfg(debug_assertions)]
         {
             let meta = file.metadata().expect("To be able to get metadata");
             debug_assert!(!meta.permissions().readonly(), "File is read-only");
         }
 
-        extractor::FileBody::new(self, file, extractor::notify::Noop)
-    }
+        let (encoding, _, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
 
-    ///Prepares upgrade for the request.
-    pub fn upgrade<U: upgrade::Upgrade>(self, _: U) -> U::Result {
-        U::upgrade_response(self)
+        extractor::file(file, body, encoding)
     }
 }
 

@@ -1,27 +1,32 @@
 //!Describes client configuration
 
 use std::io::Write;
-use std::time;
-
-use http;
-use hyper;
+use core::time;
 
 use crate::utils;
 use crate::header;
+
+///Default timer, which is used by [DefaultCfg](struct.DefaultCfg.html)
+pub type DefaultTimer = async_timer::oneshot::Timer;
+#[cfg(feature = "rustls")]
+///Default connector, which is used by [DefaultCfg](struct.DefaultCfg.html)
+pub type DefaultConnector = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
+#[cfg(not(feature = "rustls"))]
+///Default connector, which is used by [DefaultCfg](struct.DefaultCfg.html)
+pub type DefaultConnector = hyper::client::HttpConnector;
 
 ///Generic config trait.
 ///
 ///Each method describes single aspect of configuration
 ///and provided with sane defaults
 pub trait Config {
-    #[inline]
-    ///Specifies number of threads to use for DNS
-    ///resolve.
-    ///
-    ///Default number is 4
-    fn dns_threads() -> usize {
-        4
-    }
+    ///Connector type.
+    type Connector: hyper::client::connect::Connect;
+    ///Timer type.
+    type Timer: async_timer::oneshot::Oneshot;
+
+    ///Creates new connector and returns its instance.
+    fn new_connector() -> Self::Connector;
 
     #[inline]
     ///Specifies whether to automatically request compressed response.
@@ -35,6 +40,8 @@ pub trait Config {
     ///Specifies request timeout.
     ///
     ///Default is 30 seconds
+    ///
+    ///Zero duration means infinite
     fn timeout() -> time::Duration {
         time::Duration::from_secs(30)
     }
@@ -50,7 +57,7 @@ pub trait Config {
     ///
     ///- Yukikaze-sama's user-agent
     ///- `HOST` header with host, and optionally port, taken from URI.
-    fn default_headers(request: &mut super::Request) {
+    fn default_headers(request: &mut super::request::Request) {
         if !request.headers().contains_key(header::USER_AGENT) {
             request.headers_mut().insert(header::USER_AGENT, header::HeaderValue::from_static(concat!("Yukikaze/", env!("CARGO_PKG_VERSION"))));
         }
@@ -92,6 +99,22 @@ pub trait Config {
 ///Default configuration.
 ///
 ///Uses default [Config](trait.Config.html) impl.
+///
+///Connector:
+///
+///- When `rustls` enabled uses `hyper_rustls::HttpsConnector`
+///- Otherwise uses `hyper::client::HttpConnector`
 pub struct DefaultCfg;
 
-impl Config for DefaultCfg {}
+impl Config for DefaultCfg {
+    type Connector = DefaultConnector;
+    type Timer = DefaultTimer;
+
+    #[inline]
+    ///Creates new connector and returns its instance.
+    ///
+    ///Uses 4 threads by default.
+    fn new_connector() -> Self::Connector {
+        Self::Connector::new(4)
+    }
+}

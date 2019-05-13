@@ -1,19 +1,16 @@
-//!Request primitives.
+//!Client request
 
+use core::{mem, fmt};
 use std::io::Write;
-use std::{mem, fmt};
 
-use data_encoding::BASE64;
-use bytes::BufMut;
-use serde::Serialize;
-use serde_json;
-use serde_urlencoded;
+use crate::{header, utils};
+
 use http::HttpTryFrom;
 use http::header::HeaderValue;
+use bytes::BufMut;
 
-use super::upgrade;
-use crate::header;
-use crate::utils;
+pub mod tags;
+pub mod multipart;
 
 pub(crate) type HyperRequest = hyper::Request<hyper::Body>;
 
@@ -23,9 +20,6 @@ pub struct Request {
     pub(crate) parts: http::request::Parts,
     pub(crate) body: Option<bytes::Bytes>,
 }
-
-pub mod multipart;
-pub mod tags;
 
 impl Request {
     ///Creates new request.
@@ -129,7 +123,7 @@ impl Into<HyperRequest> for Request {
 ///panic.
 pub struct Builder {
     parts: http::request::Parts,
-    cookies: Option<cookie2::CookieJar>,
+    cookies: Option<cookie::CookieJar>,
 }
 
 impl Builder {
@@ -247,7 +241,7 @@ impl Builder {
     ///
     ///If jar already exists, the cookies from jar
     ///are appended.
-    pub fn set_cookie_jar(mut self, jar: cookie2::CookieJar) -> Self {
+    pub fn set_cookie_jar(mut self, jar: cookie::CookieJar) -> Self {
         if self.cookies.is_none() {
             self.cookies = Some(jar);
         } else {
@@ -262,9 +256,9 @@ impl Builder {
     }
 
     ///Adds cookie.
-    pub fn add_cookie(mut self, cookie: cookie2::Cookie<'static>) -> Self {
+    pub fn add_cookie(mut self, cookie: cookie::Cookie<'static>) -> Self {
         if self.cookies.is_none() {
-            let mut jar = cookie2::CookieJar::new();
+            let mut jar = cookie::CookieJar::new();
             jar.add(cookie);
             self.cookies = Some(jar);
         } else {
@@ -311,11 +305,11 @@ impl Builder {
             Some(password) => format!("{}:{}", username, password),
             None => format!("{}:", username)
         };
-        let encode_len = BASE64.encode_len(auth.as_bytes().len());
+        let encode_len = data_encoding::BASE64.encode_len(auth.as_bytes().len());
         let header_value = unsafe {
             let mut header_value = bytes::BytesMut::with_capacity(encode_len + BASIC.as_bytes().len());
             header_value.put_slice(BASIC.as_bytes());
-            BASE64.encode_mut(auth.as_bytes(), &mut header_value.bytes_mut()[..encode_len]);
+            data_encoding::BASE64.encode_mut(auth.as_bytes(), &mut header_value.bytes_mut()[..encode_len]);
             header_value.advance_mut(encode_len);
             http::header::HeaderValue::from_shared_unchecked(header_value.freeze())
         };
@@ -350,7 +344,7 @@ impl Builder {
     ///
     ///- If unable to encode data.
     ///- If URI creation fails
-    pub fn query<Q: Serialize>(mut self, query: &Q) -> Self {
+    pub fn query<Q: serde::Serialize>(mut self, query: &Q) -> Self {
         let mut uri_parts = self.parts.uri.into_parts();
         let path = uri_parts.path_and_query;
 
@@ -371,21 +365,21 @@ impl Builder {
         self
     }
 
-    ///Prepares upgrade for the request.
-    ///
-    ///Existing mechanisms:
-    ///
-    ///- [Websocket](../upgrade/websocket/index.html)
-    pub fn upgrade<U: upgrade::Upgrade>(self, _: U, options: U::Options) -> Request {
-        U::prepare_request(self, options)
-    }
+    /////Prepares upgrade for the request.
+    /////
+    /////Existing mechanisms:
+    /////
+    /////- [Websocket](../upgrade/websocket/index.html)
+    //pub fn upgrade<U: upgrade::Upgrade>(self, _: U, options: U::Options) -> Request {
+    //    U::prepare_request(self, options)
+    //}
 
     ///Creates request with specified body.
     ///
     ///Adds `Content-Length` if not specified by user.
     ///Following RFC, adds zero length only for `PUT` and `POST` requests
     pub fn body<B: Into<bytes::Bytes>>(mut self, body: Option<B>) -> Request {
-        use ::percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET};
+        use percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET};
 
         // set cookies
         if let Some(jar) = self.cookies.take() {
@@ -436,13 +430,13 @@ impl Builder {
     }
 
     ///Creates request with Form payload.
-    pub fn form<F: Serialize>(self, body: &F) -> Result<Request, serde_urlencoded::ser::Error> {
+    pub fn form<F: serde::Serialize>(self, body: &F) -> Result<Request, serde_urlencoded::ser::Error> {
         let body = serde_urlencoded::to_string(&body)?;
         Ok(self.set_header_if_none(header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(Some(body)))
     }
 
     ///Creates request with JSON payload.
-    pub fn json<J: Serialize>(self, body: &J) -> serde_json::Result<Request> {
+    pub fn json<J: serde::Serialize>(self, body: &J) -> serde_json::Result<Request> {
         let mut buffer = utils::BytesWriter::new();
         let _ = serde_json::to_writer(&mut buffer, &body)?;
         let body = buffer.into_inner().freeze();

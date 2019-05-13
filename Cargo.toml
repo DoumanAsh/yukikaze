@@ -1,8 +1,8 @@
 [package]
 name = "yukikaze"
-version = "0.8.0"
+version = "1.0.0"
 authors = ["Douman <douman@gmx.se>"]
-description = "Beautiful and elegant HTTP client library."
+description = "Beautiful and elegant HTTP library."
 readme = "README.md"
 repository = "https://gitlab.com/Douman/yukikaze"
 license = "Apache-2.0"
@@ -15,68 +15,47 @@ include = [
 categories = ["web-programming::http-client"]
 edition = "2018"
 
-[dependencies.ring]
-version = "0.14"
-default-features = false
-
 [dependencies.hyper]
 version = "0.12"
 default-features = false
+optional = true
 
 [dependencies]
-hyper-rustls = "0.16"
-tokio-timer = "0.2"
-bytes = "0.4"
-futures = "0.1"
-httpdate = "^0.3.2"
-
 http = "0.1"
-cookie2 = "0.12"
-percent-encoding = "1"
-etag = "1"
+percent-encoding = "1.0"
+bytes = "0.4"
 mime = "0.3"
 mime_guess = "^2.0.0-alpha.6"
+flate2 = { version = "1", optional = true }
+
+hyper-rustls = { version = "0.16", optional = true }
+
+httpdate = { version = "0.3", optional = true }
+etag = { version = "1", optional = true }
+cookie = { version = "0.12", optional = true }
+serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
+serde_urlencoded = { version = "0.5", optional = true }
 
 encoding_rs = { version = "0.8", optional = true }
-data-encoding = "2"
+data-encoding = { version = "2", optional = true }
 
-serde = "1"
-serde_json = "1"
-serde_urlencoded = "0.5"
-
-rand = { version = "0.6", optional = true }
-flate2 = { version = "^1.0.2", optional = true, default-features = false }
+futures-util-preview = { version = "0.3.0-alpha.15", features = ["compat"] }
 
 derive_more = "0.14"
+async-timer = "0.2"
 
 [package.metadata.docs.rs]
-features = ["flate2-c", "encoding", "rt", "websocket"]
+features = ["client"]
 
 [features]
-default = ["flate2-c"]
-
-# Stores request's Extensions in response's Extensions
-carry_extensions = []
-
-# Enables Websocket extension
-websocket = ["rand", "carry_extensions"]
-
+default = ["client", "rustls"]
+# Enables client
+client = ["hyper", "serde", "serde_json", "serde_urlencoded", "data-encoding", "cookie", "etag", "httpdate"]
+# Enables usage of rustls, which replaces default connectors
+rustls = ["hyper-rustls"]
 # Enables encoding/decoding of text content
 encoding = ["encoding_rs"]
 
-# Enables client runtime module
-rt-client = []
-
-# Enables runtime
-rt = ["rt-client"]
-
-# miniz-sys backend for flate2 crate
-flate2-c = ["flate2/miniz-sys"]
-
-# rust backend for flate2 crate
-flate2-rust = ["flate2/rust_backend"]
-
 [dev-dependencies]
-serde_derive = "1"
 tokio = { version = "0.1", default-features = false, features = ["rt-full"] }
-tokio-global = { version = "0.2", features = ["single"] }

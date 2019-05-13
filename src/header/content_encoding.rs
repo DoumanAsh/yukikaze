@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 ///`Content-Encoding` header
 pub enum ContentEncoding {
