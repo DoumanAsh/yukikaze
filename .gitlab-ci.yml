@@ -7,7 +7,5 @@ test:cargo:
     script:
         - rustc --version && cargo --version
         - cargo check
-        - cargo check --features websocket
         - cargo check --features encoding
-        - cargo check --features rt
-        - cargo test --features encoding,rt,websocket
+        - cargo test
