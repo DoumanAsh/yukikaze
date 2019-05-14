@@ -102,6 +102,30 @@ impl<C: config::Config> Client<C> {
         }
     }
 
+    ///Sends request and returns response, while handling redirects. Timed version.
+    ///
+    ///On timeout error it returns `async_timer::timed::Expired` as `Error`
+    ///`Expired` implements `Future` that can be used to re-spawn ongoing request again.
+    ///
+    ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
+    ///variant.
+    pub async fn send_redirect(&'static self, req: request::Request) -> Result<RequestResult, async_timer::timed::Expired<impl Future<Output=RequestResult> + 'static, C::Timer>> {
+        let timeout = C::timeout();
+        match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
+            true => Ok(awaitic!(self.redirect_request(req))),
+            false => {
+                //Note on unsafety.
+                //Here we assume that all references to self, as it is being 'static will be safe
+                //within ongoing request regardless of when user will restart expired request.
+                //But technically, even though it is static, user still should be able to move it
+                //around so it is a bit unsafe in some edgy cases.
+                let ongoing = self.redirect_request(req);
+                let job = unsafe { async_timer::Timed::<_, C::Timer>::new_unchecked(ongoing, timeout) };
+                awaitic!(job)
+            }
+        }
+    }
+
     ///Sends request and returns response, while handling redirects.
     pub async fn redirect_request(&self, mut req: request::Request) -> RequestResult {
         use http::{Method, StatusCode};
