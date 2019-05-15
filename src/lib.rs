@@ -14,7 +14,10 @@ pub mod extractor;
 pub mod upgrade;
 #[cfg(feature = "client")]
 pub mod client;
+#[macro_use]
+pub mod rt;
 
+pub extern crate lazy_static;
 pub extern crate bytes;
 pub extern crate http;
 pub extern crate percent_encoding;

@@ -38,7 +38,8 @@ impl<C: config::Config> fmt::Debug for Client<C> {
     }
 }
 
-type RequestResult = Result<response::Response, hyper::Error>;
+///Alias to result of sending request.
+pub type RequestResult = Result<response::Response, hyper::Error>;
 
 impl<C: config::Config> Client<C> {
     ///Creates new instance of client with specified configuration.

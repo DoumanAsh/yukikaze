@@ -32,6 +32,7 @@ bytes = "0.4"
 mime = "0.3"
 mime_guess = "^2.0.0-alpha.6"
 flate2 = { version = "1", optional = true }
+lazy_static = "1"
 
 hyper-rustls = { version = "0.16", optional = true }
 
@@ -52,7 +53,7 @@ derive_more = "0.14"
 async-timer = "0.2"
 
 [package.metadata.docs.rs]
-features = ["client"]
+features = ["client", "docs"]
 
 [features]
 default = ["client", "rustls"]
@@ -64,6 +65,8 @@ rustls = ["hyper-rustls"]
 encoding = ["encoding_rs"]
 # Enables websocket upgrade
 websocket = ["ring", "rand", "carry_extensions", "hyper", "data-encoding"]
+# Specifies that documentation is being generated
+docs = []
 
 # Stores request's Extensions in response's Extensions
 carry_extensions = []
