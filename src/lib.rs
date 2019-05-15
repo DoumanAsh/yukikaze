@@ -2,6 +2,11 @@
 //!
 //!Beautiful and elegant Yukikaze is little HTTP library based on [hyper](https://crates.io/crates/hyper).
 //!
+//!## Getting started:
+//!
+//!- [Client](client/index.html)
+//!- [Runtime](rt/index.html)
+//!
 //!## Features
 //!
 //!- Uses rustls for TLS
@@ -22,10 +27,6 @@
 //!- `websocket` - Enables Websocket Upgrade mechanism. Default `off`. Enables `carry_extensions` when `on`.
 //!- `carry_extensions` - Carries `http::Extensions` from request to resolved `Response`. Default `off`.
 //!
-//!## Getting started:
-//!
-//!- [Client](client/index.html)
-
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]

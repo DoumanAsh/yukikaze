@@ -1,5 +1,10 @@
 //!Client runtime
 //!
+//!Due to limitation of `async fn`, the global client is provided by means of macro
+//![declare_global_client](../../macro.declare_global_client.html).
+//!The macro defines global client in current scope, alongside companion `Request` wrapper and `GlobalRequest` trait.
+//!Refer to macro documentation for details.
+//!
 //!## Usage
 //!
 //!```rust,no_run
@@ -51,8 +56,7 @@
 ///
 ///- `GLOBAL_CLIENT` which is initialized using `lazy_static`
 ///- `Request` which uses `GLOBAL_CLIENT` and wraps `yukikaze::client::Request`
-///- Creates and defines trait `GlobalRequest` for generated `Request`. Due to it being implemented for
-///`client::Request` it is restricted to have only one global client.
+///- Creates and defines trait `GlobalRequest` for generated `Request`.
 ///
 ///See example of [generated](rt/client/generated/struct.Request.html)
 ///
