@@ -35,13 +35,17 @@
 //!                                                .empty()
 //!                                                .global()
 //!                                                .send();
-//!    let result = yukikaze::awaitic!(res).expect("To get without timeout").expect("Successful response");
+//!    let result = yukikaze::awaitic!(res).expect("To get without timeout")
+//!                                        .expect("Successful response");
 //!    assert!(result.is_success());
 //!}
 //!```
 
 #[macro_export]
 ///Declares global client for use.
+///
+///If no argument is specified, uses [`DefaultCfg`](client/config/struct.DefaultCfg.html)
+///Otherwise you must provide accessible type of unit struct that implements [`Config`](client/config/trait.Config.html)
 ///
 ///Creates following:
 ///
@@ -50,7 +54,9 @@
 ///- Creates and defines trait `GlobalRequest` for generated `Request`. Due to it being implemented for
 ///`client::Request` it is restricted to have only one global client.
 ///
-///See [generated](rt/client/generated/struct.Request.html) for example
+///See example of [generated](rt/client/generated/struct.Request.html)
+///
+///See [usage](rt/client/index.html)
 macro_rules! declare_global_client {
     ($config:ty) => {
         $crate::lazy_static::lazy_static! {
@@ -136,11 +142,15 @@ macro_rules! declare_global_client {
                 GLOBAL_CLIENT.redirect_request(self.0)
             }
         }
-    }
+    };
+    () => {
+        use $crate::client::config::DefaultCfg;
+        declare_global_client!(DefaultCfg);
+    };
 }
 
 #[cfg(feature = "docs")]
 ///Example of generated global client
 pub mod generated {
-    declare_global_client!(crate::client::config::DefaultCfg);
+    declare_global_client!();
 }
