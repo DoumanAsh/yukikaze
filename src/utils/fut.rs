@@ -1,18 +1,26 @@
+//!Future related utilities
 use core::task;
 use core::future::Future;
 use core::pin::Pin;
 use core::marker::Unpin;
 
+///Either variant.
 pub enum Either<A, B> {
+    ///Left
     Left(A),
+    ///Right
     Right(B),
 }
 
+///Create pair of future that being processed together.
+///
+///First goes left, then  right.
 pub struct Pair<A: Unpin, B: Unpin> {
     inner: Option<(A, B)>,
 }
 
 impl<A: Unpin, B: Unpin> Pair<A, B> {
+    ///Creates new instance
     pub fn new(left: A, right: B) -> Self {
         Self {
             inner: Some((left, right)),

@@ -6,7 +6,7 @@ use core::future::Future;
 use core::mem;
 use std::fs;
 
-use crate::{extractor, header};
+use crate::{extractor, header, upgrade};
 
 pub mod errors;
 
@@ -97,6 +97,14 @@ impl Response {
     ///Retrieves mutable reference to http extension map
     pub fn extensions_mut(&mut self) -> &mut http::Extensions {
         self.inner.extensions_mut()
+    }
+
+    #[cfg(feature = "carry_extensions")]
+    #[inline]
+    ///Retrieves mutable reference to http extension map
+    pub(crate) fn replace_extensions(mut self, extensions: &mut http::Extensions) -> Self {
+        core::mem::swap(extensions, self.extensions_mut());
+        self
     }
 
     #[inline]
@@ -277,6 +285,19 @@ impl Response {
         let body = futures_util::compat::Compat01As03::new(body);
 
         extractor::file(file, body, encoding)
+    }
+
+    ///Prepares upgrade for the request.
+    pub async fn upgrade<U: upgrade::Upgrade>(self, _: U) -> Result<Result<(Self, hyper::upgrade::Upgraded), hyper::Error>, U::VerifyError> {
+        if let Err(error) = U::verify_response(self.status(), self.inner.headers(), self.inner.extensions()) {
+            return Err(error);
+        }
+
+        let (head, body) = self.inner.into_parts();
+        Ok(match awaitic!(upgrade::upgrade_response(head, body.on_upgrade())) {
+            Ok((hyper, body)) => Ok((Self::new(hyper), body)),
+            Err(err) => Err(err),
+        })
     }
 }
 

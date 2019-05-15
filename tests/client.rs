@@ -125,3 +125,31 @@ fn make_request() {
     let body = futures_util::compat::Compat::new(body);
     let _result = rt.block_on(body).expect("Read body");
 }
+
+#[cfg(feature = "websocket")]
+#[test]
+fn test_websocket_upgrade() {
+    const WS_TEST: &str = "http://echo.websocket.org/?encoding=text";
+
+    let request = client::request::Request::get(WS_TEST).expect("Error with request!")
+                                                        .upgrade(yukikaze::upgrade::WebsocketUpgrade, None);
+
+    println!("request={:?}", request);
+    let mut rt = get_tokio_rt();
+    let client = client::Client::default();
+
+    let mut request = client.send(request);
+    let request = unsafe { Pin::new_unchecked(&mut request) };
+    let request = futures_util::compat::Compat::new(request);
+    let result = rt.block_on(request);
+    let result = result.expect("To get without timeout");
+    println!("result={:?}", result);
+    let response = result.expect("To get without error");
+    assert!(response.is_upgrade());
+
+    let mut upgrade = response.upgrade(yukikaze::upgrade::WebsocketUpgrade);
+    let upgrade = unsafe { Pin::new_unchecked(&mut upgrade) };
+    let upgrade = futures_util::compat::Compat::new(upgrade);
+    let (response, _) = rt.block_on(upgrade).expect("To validate upgrade").expect("To finish upgrade");
+    assert!(response.is_upgrade());
+}

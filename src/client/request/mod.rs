@@ -365,14 +365,15 @@ impl Builder {
         self
     }
 
-    /////Prepares upgrade for the request.
-    /////
-    /////Existing mechanisms:
-    /////
-    /////- [Websocket](../upgrade/websocket/index.html)
-    //pub fn upgrade<U: upgrade::Upgrade>(self, _: U, options: U::Options) -> Request {
-    //    U::prepare_request(self, options)
-    //}
+    ///Prepares upgrade for the request.
+    ///
+    ///Existing mechanisms:
+    ///
+    ///- [Websocket](../../upgrade/websocket/index.html)
+    pub fn upgrade<U: crate::upgrade::Upgrade>(mut self, _: U, options: U::Options) -> Request {
+        U::prepare_request(&mut self.parts.headers, &mut self.parts.extensions, options);
+        self.empty()
+    }
 
     ///Creates request with specified body.
     ///

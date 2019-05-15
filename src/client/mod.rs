@@ -73,10 +73,20 @@ impl<C: config::Config> Client<C> {
     pub async fn request(&self, mut req: request::Request) -> RequestResult {
         Self::apply_headers(&mut req);
 
+        #[cfg(feature = "carry_extensions")]
+        let mut extensions = req.extract_extensions();
+
         let ongoing = self.inner.request(req.into());
         let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
 
-        awaitic!(ongoing)
+        #[cfg(feature = "carry_extensions")]
+        {
+            awaitic!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))
+        }
+        #[cfg(not(feature = "carry_extensions"))]
+        {
+            awaitic!(ongoing)
+        }
     }
 
     ///Sends request and returns response. Timed version.
@@ -89,15 +99,28 @@ impl<C: config::Config> Client<C> {
     pub async fn send(&self, mut req: request::Request) -> Result<RequestResult, async_timer::timed::Expired<impl Future<Output=RequestResult>, C::Timer>> {
         Self::apply_headers(&mut req);
 
+        #[cfg(feature = "carry_extensions")]
+        let mut extensions = req.extract_extensions();
+
         let ongoing = self.inner.request(req.into());
         let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
 
         let timeout = C::timeout();
         match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
+            #[cfg(not(feature = "carry_extensions"))]
             true => Ok(awaitic!(ongoing)),
+            #[cfg(feature = "carry_extensions")]
+            true => Ok(awaitic!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))),
             false => {
                 let job = async_timer::Timed::<_, C::Timer>::new(ongoing, timeout);
-                awaitic!(job)
+                #[cfg(not(feature = "carry_extensions"))]
+                {
+                    awaitic!(job)
+                }
+                #[cfg(feature = "carry_extensions")]
+                {
+                    awaitic!(job).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
+                }
             }
         }
     }
@@ -138,14 +161,21 @@ impl<C: config::Config> Client<C> {
         let uri = req.parts.uri.clone();
         let mut headers = req.parts.headers.clone();
         let mut body = req.body.clone();
+        #[cfg(feature = "carry_extensions")]
+        let mut extensions = req.extract_extensions();
 
         loop {
-            let res = awaitic!(self.request(req))?;
+            let ongoing = self.inner.request(req.into());
+            let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
+            let res = awaitic!(ongoing)?;
 
             match res.status() {
                 StatusCode::SEE_OTHER => {
                     rem_redirect -= 1;
                     match rem_redirect {
+                        #[cfg(feature = "carry_extensions")]
+                        0 => return Ok(res.replace_extensions(&mut extensions)),
+                        #[cfg(not(feature = "carry_extensions"))]
                         0 => return Ok(res),
                         _ => {
                             //All requests should be changed to GET with no body.
@@ -158,10 +188,16 @@ impl<C: config::Config> Client<C> {
                 StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND | StatusCode::TEMPORARY_REDIRECT | StatusCode::PERMANENT_REDIRECT => {
                     rem_redirect -= 1;
                     match rem_redirect {
+                        #[cfg(feature = "carry_extensions")]
+                        0 => return Ok(res.replace_extensions(&mut extensions)),
+                        #[cfg(not(feature = "carry_extensions"))]
                         0 => return Ok(res),
                         _ => (),
                     }
                 }
+                #[cfg(feature = "carry_extensions")]
+                _ => return Ok(res.replace_extensions(&mut extensions)),
+                #[cfg(not(feature = "carry_extensions"))]
                 _ => return Ok(res),
             }
 
@@ -198,6 +234,9 @@ impl<C: config::Config> Client<C> {
                         hyper::Uri::from_parts(loc_parts).expect("Create redirect URI")
                     },
                 },
+                #[cfg(feature = "carry_extensions")]
+                None => return Ok(res.replace_extensions(&mut extensions)),
+                #[cfg(not(feature = "carry_extensions"))]
                 None => return Ok(res),
             };
 
