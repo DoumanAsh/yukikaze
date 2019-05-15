@@ -53,7 +53,7 @@ derive_more = "0.14"
 async-timer = "0.2"
 
 [package.metadata.docs.rs]
-features = ["client", "docs"]
+features = ["client", "encoding", "websocket", "docs"]
 
 [features]
 default = ["client", "rustls", "flate2-c"]

@@ -24,7 +24,7 @@
 //!
 //!## Getting started:
 //!
-//!- [Client](client/struct.Client.html)
+//!- [Client](client/index.html)
 
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
