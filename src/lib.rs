@@ -21,6 +21,10 @@
 //!- `encoding` - Enables `encoding` crate support. Default `off`.
 //!- `websocket` - Enables Websocket Upgrade mechanism. Default `off`. Enables `carry_extensions` when `on`.
 //!- `carry_extensions` - Carries `http::Extensions` from request to resolved `Response`. Default `off`.
+//!
+//!## Getting started:
+//!
+//!- [Client](client/struct.Client.html)
 
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]

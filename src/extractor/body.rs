@@ -345,7 +345,7 @@ pub async fn text_notify<S, N: Notifier>(body: S, encoding: ContentEncoding, lim
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
 ///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
-pub async fn text_charset_notify<S, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding, mut notify: N) -> Result<String, BodyReadError>
+pub async fn text_charset_notify<S, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding, notify: N) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
 {
     let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
@@ -380,7 +380,7 @@ pub async fn json_notify<S, N: Notifier, J>(body: S, encoding: ContentEncoding, 
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
 ///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
-pub async fn json_charset_notify<S, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding, mut notify: N) -> Result<J, BodyReadError>
+pub async fn json_charset_notify<S, N: Notifier, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding, notify: N) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin, J: serde::de::DeserializeOwned
 {
     let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
