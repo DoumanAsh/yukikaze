@@ -1,4 +1,6 @@
 //!Extractors module
+//!
+//!Various utilities that are used by yukikaze client module
 
 use std::{string, io};
 use std::error::Error;

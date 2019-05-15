@@ -1,4 +1,67 @@
 //!Client module
+//!
+//!Entry point to HTTP client side.
+//!
+//!## API highlights
+//!
+//!- [Client](struct.Client.html) - Wraps `hyper::Client` and provides various async methods to send requests
+//!- [Request](request/struct.Request.html) - Entry point to creating requests.
+//!- [Response](response/struct.Response.html) - Result of successful requests. Provides various async methods to read body.
+//!
+//!## Usage
+//!
+//!### Simple
+//!
+//!```rust, no_run
+//!#![feature(async_await)]
+//!
+//!use yukikaze::{awaitic, client};
+//!
+//!async fn example() {
+//!    let client = client::Client::default();
+//!
+//!    let req = client::Request::get("https://google.com").expect("To create request").empty();
+//!    let mut result = awaitic!(client.send(req)).expect("Not timedout").expect("Successful");
+//!    assert!(result.is_success());
+//!
+//!    let html = awaitic!(result.text()).expect("To read HTML");
+//!    println!("Google page:\n{}", html);
+//!}
+//!```
+//!
+//!### Custom configuration
+//!
+//!```rust, no_run
+//!#![feature(async_await)]
+//!use yukikaze::{awaitic, client};
+//!
+//!use core::time;
+//!
+//!pub struct TimeoutCfg;
+//!
+//!impl client::config::Config for TimeoutCfg {
+//!    type Connector = client::config::DefaultConnector;
+//!    type Timer = client::config::DefaultTimer;
+//!
+//!    fn new_connector() -> Self::Connector {
+//!        Self::Connector::new(4)
+//!    }
+//!
+//!    fn timeout() -> time::Duration {
+//!        //never times out
+//!        time::Duration::from_secs(0)
+//!    }
+//!}
+//!
+//!async fn example() {
+//!    let client = client::Client::<TimeoutCfg>::new();
+//!
+//!    let req = client::Request::get("https://google.com").expect("To create request").empty();
+//!    let result = awaitic!(client.send(req)).expect("Not timedout").expect("Successful");
+//!    assert!(result.is_success());
+//!}
+//!```
+
 use hyper::client::connect::Connect;
 use futures_util::future::FutureExt;
 

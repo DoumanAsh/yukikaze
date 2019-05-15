@@ -287,6 +287,63 @@ impl Response {
         extractor::file(file, body, encoding)
     }
 
+    ///Extracts Response's body as raw bytes.
+    pub fn body_notify<N: extractor::Notifier>(&mut self, notify: N) -> impl Future<Output=Result<bytes::Bytes, extractor::BodyReadError>> {
+        let (encoding, buffer_size, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        extractor::raw_bytes_notify(body, encoding, buffer_size, notify)
+    }
+
+    ///Extracts Response's body as text
+    pub fn text_notify<N: extractor::Notifier>(&mut self, notify: N) -> impl Future<Output=Result<String, extractor::BodyReadError>> {
+        let (encoding, buffer_size, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        #[cfg(feature = "encoding")]
+        {
+            let charset = self.charset_encoding().unwrap_or(encoding_rs::UTF_8);
+            extractor::text_charset_notify(body, encoding, buffer_size, charset, notify)
+        }
+
+        #[cfg(not(feature = "encoding"))]
+        {
+            extractor::text_notify(body, encoding, buffer_size, notify)
+        }
+    }
+
+    ///Extracts Response's body as JSON
+    pub fn json_notify<N: extractor::Notifier, J: serde::de::DeserializeOwned>(&mut self, notify: N) -> impl Future<Output=Result<J, extractor::BodyReadError>> {
+        let (encoding, buffer_size, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        #[cfg(feature = "encoding")]
+        {
+            let charset = self.charset_encoding().unwrap_or(encoding_rs::UTF_8);
+            extractor::json_charset_notify(body, encoding, buffer_size, charset, notify)
+        }
+
+        #[cfg(not(feature = "encoding"))]
+        {
+            extractor::json_notify(body, encoding, buffer_size, notify)
+        }
+    }
+
+    ///Extracts Response's body into file
+    pub fn file_notify<N: extractor::Notifier>(&mut self, file: fs::File, notify: N) -> impl Future<Output=Result<fs::File, extractor::BodyReadError>> {
+        #[cfg(debug_assertions)]
+        {
+            let meta = file.metadata().expect("To be able to get metadata");
+            debug_assert!(!meta.permissions().readonly(), "File is read-only");
+        }
+
+        let (encoding, _, body) = self.extract_body();
+        let body = futures_util::compat::Compat01As03::new(body);
+
+        extractor::file_notify(file, body, encoding, notify)
+    }
+
+
     ///Prepares upgrade for the request.
     pub async fn upgrade<U: upgrade::Upgrade>(self, _: U) -> Result<Result<(Self, hyper::upgrade::Upgraded), hyper::Error>, U::VerifyError> {
         if let Err(error) = U::verify_response(self.status(), self.inner.headers(), self.inner.extensions()) {
