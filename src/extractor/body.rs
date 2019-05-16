@@ -7,6 +7,7 @@ use super::BodyReadError;
 use crate::header::ContentEncoding;
 
 use futures_util::stream::StreamExt;
+#[cfg(feature = "encoding")]
 use encoding_rs::Encoding;
 
 use super::Notifier;
