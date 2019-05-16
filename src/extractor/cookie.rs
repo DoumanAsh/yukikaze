@@ -8,7 +8,16 @@ use crate::header;
 ///up original response, if you want avoid it
 ///you can use `Cookie::into_owned()`
 pub struct CookieIter<'a> {
-    pub(crate) iter: header::ValueIter<'a, header::HeaderValue>,
+    iter: header::ValueIter<'a, header::HeaderValue>,
+}
+
+impl<'a> CookieIter<'a> {
+    ///Creates new instance from `http::header::ValueIter`
+    pub fn new(iter: header::ValueIter<'a, header::HeaderValue>) -> Self {
+        Self {
+            iter
+        }
+    }
 }
 
 impl<'a> Iterator for CookieIter<'a> {

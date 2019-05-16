@@ -175,9 +175,7 @@ impl Response {
     #[inline]
     ///Creates iterator of cookie from `Set-Cookie` header.
     pub fn cookies_iter(&self) -> extractor::CookieIter {
-        extractor::CookieIter {
-            iter: self.headers().get_all(header::SET_COOKIE).iter()
-        }
+        extractor::CookieIter::new(self.headers().get_all(header::SET_COOKIE).iter())
     }
 
     #[inline]
