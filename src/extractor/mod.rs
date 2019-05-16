@@ -17,9 +17,6 @@ pub use body::{*};
 #[derive(Debug, derive_more::Display)]
 ///Describes possible errors when reading body.
 pub enum BodyReadError {
-    #[display(fmt = "Failed to read due to HTTP error: {}", "_0")]
-    ///Hyper's error.
-    Hyper(hyper::Error),
     #[display(fmt = "Read limit is reached. Aborted reading.")]
     ///Hits limit, contains already read data.
     Overflow(bytes::Bytes),
@@ -38,6 +35,17 @@ pub enum BodyReadError {
     #[display(fmt = "Error file writing response into file. Error: {}", "_1")]
     ///Error happened when writing to file.
     FileError(fs::File, io::Error),
+    #[display(fmt = "IO Error while reading: {}", "_0")]
+    ///Some IO Error during reading
+    ///
+    ///Convertion from `io::Error` creates this  variant
+    ReadError(io::Error),
+    #[cfg(feature = "client")]
+    #[display(fmt = "Failed to read due to HTTP error: {}", "_0")]
+    ///Hyper's error.
+    ///
+    ///Disabled when `client` feature is not enabled
+    Hyper(hyper::Error),
 }
 
 impl From<serde_json::error::Error> for BodyReadError {
@@ -54,6 +62,14 @@ impl From<string::FromUtf8Error> for BodyReadError {
     }
 }
 
+impl From<io::Error> for BodyReadError {
+    #[inline]
+    fn from(error: io::Error) -> Self {
+        BodyReadError::ReadError(error)
+    }
+}
+
+#[cfg(feature = "client")]
 impl From<hyper::Error> for BodyReadError {
     #[inline]
     fn from(err: hyper::Error) -> Self {

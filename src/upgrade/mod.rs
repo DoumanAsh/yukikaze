@@ -22,7 +22,9 @@ pub trait Upgrade {
     fn verify_response(status: http::StatusCode, headers: &http::HeaderMap, extensions: &http::Extensions) -> Result<(), Self::VerifyError>;
 }
 
+#[cfg(feature = "client")]
 pub(crate) type UpgradeRes = Result<(hyper::Response<hyper::Body>, hyper::upgrade::Upgraded), hyper::Error>;
+#[cfg(feature = "client")]
 ///Utility to upgrade using hyper's upgrade mechanism
 pub async fn upgrade_response(parts: http::response::Parts, body: hyper::upgrade::OnUpgrade) -> UpgradeRes {
     let upgrade = futures_util::compat::Compat01As03::new(body);

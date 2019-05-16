@@ -7,6 +7,7 @@ use super::BodyReadError;
 use crate::header::ContentEncoding;
 
 use futures_util::stream::StreamExt;
+use encoding_rs::Encoding;
 
 use super::Notifier;
 
@@ -27,8 +28,8 @@ fn calculate_buffer_size(limit: Option<usize>) -> (usize, usize) {
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
-pub async fn raw_bytes<S>(mut body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<bytes::Bytes, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<bytes::Bytes, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
     let (limit, buffer_size) = calculate_buffer_size(limit);
 
@@ -39,11 +40,11 @@ pub async fn raw_bytes<S>(mut body: S, encoding: ContentEncoding, limit: Option<
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
 
                 if limit < decoder.get_ref().len() {
@@ -61,11 +62,11 @@ pub async fn raw_bytes<S>(mut body: S, encoding: ContentEncoding, limit: Option<
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
 
                 if limit < decoder.get_ref().len() {
@@ -82,11 +83,11 @@ pub async fn raw_bytes<S>(mut body: S, encoding: ContentEncoding, limit: Option<
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                buffer.extend_from_slice(&chunk);
+                buffer.extend_from_slice(&chunk[..]);
                 if buffer.len() > limit {
                     return Err(BodyReadError::Overflow(buffer.freeze()));
                 }
@@ -104,8 +105,8 @@ pub async fn raw_bytes<S>(mut body: S, encoding: ContentEncoding, limit: Option<
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
-pub async fn text<S>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<String, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
     let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
 
@@ -121,8 +122,8 @@ pub async fn text<S>(body: S, encoding: ContentEncoding, limit: Option<usize>) -
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
 ///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
-pub async fn text_charset<S>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<String, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
     let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
 
@@ -139,8 +140,8 @@ pub async fn text_charset<S>(body: S, encoding: ContentEncoding, limit: Option<u
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
-pub async fn json<S, J>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin, J: serde::de::DeserializeOwned
+pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<J, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
     let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
 
@@ -156,8 +157,8 @@ pub async fn json<S, J>(body: S, encoding: ContentEncoding, limit: Option<usize>
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
 ///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
-pub async fn json_charset<S, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin, J: serde::de::DeserializeOwned
+pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<J, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
     let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
 
@@ -174,8 +175,8 @@ pub async fn json_charset<S, J>(body: S, encoding: ContentEncoding, limit: Optio
 ///`file` - Into which to write
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies encoding to use.
-pub async fn file<S>(file: File, mut body: S, encoding: ContentEncoding) -> Result<File, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -> Result<File, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
     let file = io::BufWriter::new(file);
 
@@ -186,11 +187,11 @@ pub async fn file<S>(file: File, mut body: S, encoding: ContentEncoding) -> Resu
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
             }
 
             decoder.finish().map_err(|error| BodyReadError::GzipError(error))?
@@ -201,11 +202,11 @@ pub async fn file<S>(file: File, mut body: S, encoding: ContentEncoding) -> Resu
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
             }
 
             decoder.finish().map_err(|error| BodyReadError::DeflateError(error))?
@@ -215,11 +216,11 @@ pub async fn file<S>(file: File, mut body: S, encoding: ContentEncoding) -> Resu
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                match buffer.write_all(&chunk) {
+                match buffer.write_all(&chunk[..]) {
                     Ok(_) => (),
                     //TODO: consider how to get File without stumbling into error
                     Err(error) => return Err(BodyReadError::FileError(buffer.into_inner().expect("To get File"), error)),
@@ -246,8 +247,8 @@ pub async fn file<S>(file: File, mut body: S, encoding: ContentEncoding) -> Resu
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
-pub async fn raw_bytes_notify<S, N: Notifier>(mut body: S, encoding: ContentEncoding, limit: Option<usize>, mut notify: N) -> Result<bytes::Bytes, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: ContentEncoding, limit: Option<usize>, mut notify: N) -> Result<bytes::Bytes, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
     let (limit, buffer_size) = calculate_buffer_size(limit);
 
@@ -258,11 +259,11 @@ pub async fn raw_bytes_notify<S, N: Notifier>(mut body: S, encoding: ContentEnco
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
 
                 notify.send(chunk.len());
@@ -282,11 +283,11 @@ pub async fn raw_bytes_notify<S, N: Notifier>(mut body: S, encoding: ContentEnco
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
 
                 notify.send(chunk.len());
@@ -305,11 +306,11 @@ pub async fn raw_bytes_notify<S, N: Notifier>(mut body: S, encoding: ContentEnco
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                buffer.extend_from_slice(&chunk);
+                buffer.extend_from_slice(&chunk[..]);
                 notify.send(chunk.len());
                 if buffer.len() > limit {
                     return Err(BodyReadError::Overflow(buffer.freeze()));
@@ -328,8 +329,8 @@ pub async fn raw_bytes_notify<S, N: Notifier>(mut body: S, encoding: ContentEnco
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
-pub async fn text_notify<S, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<String, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
     let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -345,8 +346,8 @@ pub async fn text_notify<S, N: Notifier>(body: S, encoding: ContentEncoding, lim
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
 ///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
-pub async fn text_charset_notify<S, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding, notify: N) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<String, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, N: Notifier,
 {
     let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -363,8 +364,8 @@ pub async fn text_charset_notify<S, N: Notifier>(body: S, encoding: ContentEncod
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
-pub async fn json_notify<S, N: Notifier, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin, J: serde::de::DeserializeOwned
+pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<J, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
     let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -380,8 +381,8 @@ pub async fn json_notify<S, N: Notifier, J>(body: S, encoding: ContentEncoding, 
 ///`encoding` - Specifies content's encoding to use.
 ///`limit` - Specifies limit on body size, if not specified uses default 4kb
 ///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
-pub async fn json_charset_notify<S, N: Notifier, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static encoding_rs::Encoding, notify: N) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin, J: serde::de::DeserializeOwned
+pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<J, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
     let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -398,8 +399,8 @@ pub async fn json_charset_notify<S, N: Notifier, J>(body: S, encoding: ContentEn
 ///`file` - Into which to write
 ///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///`encoding` - Specifies encoding to use.
-pub async fn file_notify<S, N: Notifier>(file: File, mut body: S, encoding: ContentEncoding, mut notify: N) -> Result<File, BodyReadError>
-    where S: StreamExt<Item=Result<hyper::Chunk, hyper::Error>> + Unpin
+pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding: ContentEncoding, mut notify: N) -> Result<File, BodyReadError>
+    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
     let file = io::BufWriter::new(file);
 
@@ -410,11 +411,11 @@ pub async fn file_notify<S, N: Notifier>(file: File, mut body: S, encoding: Cont
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::GzipError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
                 notify.send(chunk.len());
             }
 
@@ -426,11 +427,11 @@ pub async fn file_notify<S, N: Notifier>(file: File, mut body: S, encoding: Cont
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                decoder.write_all(&chunk).map_err(|error| BodyReadError::DeflateError(error))?;
+                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
                 notify.send(chunk.len());
             }
 
@@ -441,11 +442,11 @@ pub async fn file_notify<S, N: Notifier>(file: File, mut body: S, encoding: Cont
 
             while let Some(chunk) = awaitic!(body.next()) {
                 let chunk = match chunk {
-                    Ok(chunk) => chunk,
+                    Ok(chunk) => chunk.into(),
                     Err(error) => return Err(error.into()),
                 };
 
-                match buffer.write_all(&chunk) {
+                match buffer.write_all(&chunk[..]) {
                     Ok(_) => notify.send(chunk.len()),
                     //TODO: consider how to get File without stumbling into error
                     Err(error) => return Err(BodyReadError::FileError(buffer.into_inner().expect("To get File"), error)),
