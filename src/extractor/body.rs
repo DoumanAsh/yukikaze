@@ -26,9 +26,9 @@ fn calculate_buffer_size(limit: Option<usize>) -> (usize, usize) {
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<bytes::Bytes, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
@@ -103,9 +103,9 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
@@ -119,10 +119,10 @@ pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usi
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
-///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
@@ -138,9 +138,9 @@ pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Op
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
@@ -154,10 +154,10 @@ pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
-///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
@@ -173,9 +173,9 @@ pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit:
 ///
 ///Params:
 ///
-///`file` - Into which to write
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies encoding to use.
+///- `file` - Into which to write
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies encoding to use.
 pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -> Result<File, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
@@ -245,9 +245,9 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: ContentEncoding, limit: Option<usize>, mut notify: N) -> Result<bytes::Bytes, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
@@ -327,9 +327,9 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
@@ -343,10 +343,10 @@ pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncodin
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
-///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, N: Notifier,
 {
@@ -362,9 +362,9 @@ pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding,
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
@@ -378,10 +378,10 @@ pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limi
 ///
 ///Params:
 ///
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies content's encoding to use.
-///`limit` - Specifies limit on body size, if not specified uses default 4kb
-///`charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies content's encoding to use.
+///- `limit` - Specifies limit on body size, if not specified uses default 4kb
+///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
@@ -397,9 +397,9 @@ pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncodi
 ///
 ///Params:
 ///
-///`file` - Into which to write
-///`body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
-///`encoding` - Specifies encoding to use.
+///- `file` - Into which to write
+///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
+///- `encoding` - Specifies encoding to use.
 pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding: ContentEncoding, mut notify: N) -> Result<File, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
