@@ -9,6 +9,7 @@ use crate::header::ContentEncoding;
 use futures_util::stream::StreamExt;
 #[cfg(feature = "encoding")]
 use encoding_rs::Encoding;
+use bytes::BufMut;
 
 use super::Notifier;
 
@@ -16,10 +17,10 @@ const BUFFER_SIZE: usize = 4096;
 
 #[inline(always)]
 fn calculate_buffer_size(limit: Option<usize>) -> (usize, usize) {
-    let limit = limit.unwrap_or(BUFFER_SIZE);
-    let buffer_size = cmp::min(BUFFER_SIZE, limit);
-
-    (limit, buffer_size)
+    match limit {
+        Some(limit) => (limit, cmp::min(BUFFER_SIZE, limit)),
+        None => (BUFFER_SIZE, BUFFER_SIZE)
+    }
 }
 
 ///Extracts body as bytes from `Stream`
@@ -40,10 +41,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
             let mut decoder = flate2::write::GzDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
@@ -62,10 +60,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
             let mut decoder = flate2::write::ZlibDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
@@ -83,10 +78,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 buffer.extend_from_slice(&chunk[..]);
                 if buffer.len() > limit {
@@ -187,10 +179,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
             let mut decoder = flate2::write::GzDecoder::new(file);
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
             }
@@ -202,10 +191,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
             let mut decoder = flate2::write::ZlibDecoder::new(file);
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
             }
@@ -216,10 +202,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
             let mut buffer = file;
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 match buffer.write_all(&chunk[..]) {
                     Ok(_) => (),
@@ -259,10 +242,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
             let mut decoder = flate2::write::GzDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
@@ -283,10 +263,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
             let mut decoder = flate2::write::ZlibDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
                 decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
@@ -306,10 +283,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 buffer.extend_from_slice(&chunk[..]);
                 notify.send(chunk.len());
@@ -411,10 +385,7 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
             let mut decoder = flate2::write::GzDecoder::new(file);
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
                 notify.send(chunk.len());
@@ -427,10 +398,7 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
             let mut decoder = flate2::write::ZlibDecoder::new(file);
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
                 notify.send(chunk.len());
@@ -442,10 +410,7 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
             let mut buffer = file;
 
             while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = match chunk {
-                    Ok(chunk) => chunk.into(),
-                    Err(error) => return Err(error.into()),
-                };
+                let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 match buffer.write_all(&chunk[..]) {
                     Ok(_) => notify.send(chunk.len()),
