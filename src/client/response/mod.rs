@@ -218,8 +218,11 @@ impl Response {
                             .and_then(|header| header.trim().parse().ok())
     }
 
-    #[inline(always)]
-    fn extract_body(&mut self) -> (header::ContentEncoding, Option<usize>, hyper::Body) {
+    #[inline]
+    ///Extracts hyper's body out of Response.
+    ///
+    ///Returns Content encoding, Length, if specified, and body itself.
+    pub fn extract_body(&mut self) -> (header::ContentEncoding, Option<usize>, hyper::Body) {
         let encoding = self.content_encoding();
         let buffer_size = self.content_len();
         let mut body = hyper::Body::empty();
