@@ -28,10 +28,12 @@ impl ContentEncoding {
     ///user must decompress himself.
     pub fn can_decompress(&self) -> bool {
         match *self {
-            #[cfg(feature = "flate2")]
+            #[cfg(feature = "compu")]
             ContentEncoding::Gzip => true,
-            #[cfg(feature = "flate2")]
+            #[cfg(feature = "compu")]
             ContentEncoding::Deflate => true,
+            #[cfg(feature = "compu")]
+            ContentEncoding::Brotli => true,
             _ => false,
         }
     }

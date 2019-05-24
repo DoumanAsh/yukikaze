@@ -20,9 +20,8 @@
 //!## Available cargo features
 //!
 //!- `client` - Enables client module. By default `on`.
-//!- `rustls` - Enables use of `rustls` for default SSL implementation. By default `on`
-//!- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default `on`.
-//!- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default `off`.
+//!- `rustls` - Enables use of `rustls` for default SSL implementation. By default `on`.
+//!- `compu` - Enables compression support. By default `on`.
 //!- `encoding` - Enables `encoding` crate support. Default `off`.
 //!- `websocket` - Enables Websocket Upgrade mechanism. Default `off`. Enables `carry_extensions` when `on`.
 //!- `carry_extensions` - Carries `http::Extensions` from request to resolved `Response`. Default `off`.
@@ -49,8 +48,8 @@ pub extern crate percent_encoding;
 pub extern crate async_timer;
 #[cfg(feature = "encoding")]
 pub extern crate encoding_rs;
-#[cfg(feature = "flate2")]
-pub extern crate flate2;
+#[cfg(feature = "compu")]
+pub extern crate compu;
 #[cfg(feature = "websocket")]
 pub extern crate ring;
 #[cfg(feature = "client")]

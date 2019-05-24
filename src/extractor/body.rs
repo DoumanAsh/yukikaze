@@ -9,6 +9,8 @@ use crate::header::ContentEncoding;
 use futures_util::stream::StreamExt;
 #[cfg(feature = "encoding")]
 use encoding_rs::Encoding;
+#[cfg(feature = "compu")]
+use compu::decoder::Decoder;
 
 use super::Notifier;
 
@@ -19,6 +21,105 @@ fn calculate_buffer_size(limit: Option<usize>) -> (usize, usize) {
     match limit {
         Some(limit) => (limit, cmp::min(BUFFER_SIZE, limit)),
         None => (BUFFER_SIZE, BUFFER_SIZE)
+    }
+}
+
+#[cfg(feature = "compu")]
+macro_rules! impl_compu_bytes {
+    ($decoder:expr, $body:expr, $limit:expr) => {
+        use compu::decoder::DecoderResult;
+
+        let mut decoder = compu::decompressor::memory::Decompressor::new($decoder);
+
+        while let Some(chunk) = awaitic!($body.next()) {
+            let chunk = chunk.map(Into::into).map_err(Into::into)?;
+
+            match decoder.push(&chunk) {
+                DecoderResult::Finished => break,
+                DecoderResult::NeedInput => (),
+                result => return Err(BodyReadError::CompuError(result)),
+            }
+
+            if $limit < decoder.output().len() {
+                return Err(BodyReadError::Overflow(decoder.take().into()))
+            }
+        }
+
+        match decoder.decoder().is_finished() {
+            true => return Ok(decoder.take().into()),
+            false => return Err(BodyReadError::IncompleteDecompression),
+        }
+    };
+    ($decoder:expr, $body:expr, $limit:expr, $notify:expr) => {
+        use compu::decoder::DecoderResult;
+
+        let mut decoder = compu::decompressor::memory::Decompressor::new($decoder);
+
+        while let Some(chunk) = awaitic!($body.next()) {
+            let chunk = chunk.map(Into::into).map_err(Into::into)?;
+
+            $notify.send(chunk.len());
+
+            match decoder.push(&chunk) {
+                DecoderResult::Finished => break,
+                DecoderResult::NeedInput => (),
+                result => return Err(BodyReadError::CompuError(result)),
+            }
+
+            if $limit < decoder.output().len() {
+                return Err(BodyReadError::Overflow(decoder.take().into()))
+            }
+        }
+
+        match decoder.decoder().is_finished() {
+            true => return Ok(decoder.take().into()),
+            false => return Err(BodyReadError::IncompleteDecompression),
+        }
+    }
+}
+#[cfg(feature = "compu")]
+macro_rules! impl_compu_file {
+    ($decoder:expr, $body:expr, $file:expr) => {
+        use compu::decoder::DecoderResult;
+
+        let mut decoder = compu::decompressor::write::Decompressor::new($decoder, $file);
+
+        while let Some(chunk) = awaitic!($body.next()) {
+            let chunk = chunk.map(Into::into).map_err(Into::into)?;
+
+            match decoder.push(&chunk)? {
+                DecoderResult::Finished => break,
+                DecoderResult::NeedInput => (),
+                result => return Err(BodyReadError::CompuError(result)),
+            }
+        }
+
+        match decoder.decoder().is_finished() {
+            true => (),
+            false => return Err(BodyReadError::IncompleteDecompression),
+        }
+    };
+    ($decoder:expr, $body:expr, $file:expr, $notify:expr) => {
+        use compu::decoder::DecoderResult;
+
+        let mut decoder = compu::decompressor::write::Decompressor::new($decoder, $file);
+
+        while let Some(chunk) = awaitic!($body.next()) {
+            let chunk = chunk.map(Into::into).map_err(Into::into)?;
+
+            $notify.send(chunk.len());
+
+            match decoder.push(&chunk) {
+                DecoderResult::Finished => break,
+                DecoderResult::NeedInput => (),
+                result => return Err(BodyReadError::CompuError(result)),
+            }
+        }
+
+        match decoder.decoder().is_finished() {
+            true => decoder.take(),
+            false => return Err(BodyReadError::IncompleteDecompression),
+        }
     }
 }
 
@@ -35,43 +136,19 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
     let (limit, buffer_size) = calculate_buffer_size(limit);
 
     match encoding {
-        #[cfg(feature = "flate2")]
-        ContentEncoding::Gzip => {
-            let mut decoder = flate2::write::GzDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
-                decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
-
-                if limit < decoder.get_ref().len() {
-                    let _ = decoder.try_finish();
-                    return Err(BodyReadError::Overflow(decoder.get_mut().freeze()));
-                }
-            }
-
-            decoder.try_finish().map_err(|error| BodyReadError::GzipError(error))?;
-            Ok(decoder.get_mut().freeze())
+        #[cfg(feature = "compu")]
+        ContentEncoding::Brotli => {
+            impl_compu_bytes!(compu::decoder::brotli::BrotliDecoder::default(), body, limit);
         },
-        #[cfg(feature = "flate2")]
+        #[cfg(feature = "compu")]
+        ContentEncoding::Gzip => {
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Gzip);
+            impl_compu_bytes!(compu::decoder::zlib::ZlibDecoder::new(&options), body, limit);
+        },
+        #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let mut decoder = flate2::write::ZlibDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
-                decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
-
-                if limit < decoder.get_ref().len() {
-                    let _ = decoder.try_finish();
-                    return Err(BodyReadError::Overflow(decoder.get_mut().freeze()));
-                }
-            }
-
-            decoder.try_finish().map_err(|error| BodyReadError::DeflateError(error))?;
-            Ok(decoder.get_mut().freeze())
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            impl_compu_bytes!(compu::decoder::zlib::ZlibDecoder::new(&options), body, limit);
         },
         _ => {
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
@@ -170,47 +247,31 @@ pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit:
 pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -> Result<File, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
-    let file = io::BufWriter::new(file);
+    let mut file = io::BufWriter::new(file);
 
-    let file = match encoding {
-        #[cfg(feature = "flate2")]
+    match encoding {
+        #[cfg(feature = "compu")]
+        ContentEncoding::Brotli => {
+            impl_compu_file!(compu::decoder::brotli::BrotliDecoder::default(), body, &mut file);
+        },
+        #[cfg(feature = "compu")]
         ContentEncoding::Gzip => {
-            let mut decoder = flate2::write::GzDecoder::new(file);
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
-            }
-
-            decoder.finish().map_err(|error| BodyReadError::GzipError(error))?
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Gzip);
+            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        #[cfg(feature = "flate2")]
+        #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let mut decoder = flate2::write::ZlibDecoder::new(file);
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
-            }
-
-            decoder.finish().map_err(|error| BodyReadError::DeflateError(error))?
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        _ => {
-            let mut buffer = file;
+        _ => while let Some(chunk) = awaitic!(body.next()) {
+            let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                match buffer.write_all(&chunk[..]) {
-                    Ok(_) => (),
-                    //TODO: consider how to get File without stumbling into error
-                    Err(error) => return Err(BodyReadError::FileError(buffer.into_inner().expect("To get File"), error)),
-                }
+            match file.write_all(&chunk[..]) {
+                Ok(_) => (),
+                //TODO: consider how to get File without stumbling into error
+                Err(error) => return Err(BodyReadError::FileError(file.into_inner().expect("To get File"), error)),
             }
-
-            buffer
         }
     };
 
@@ -236,47 +297,19 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
     let (limit, buffer_size) = calculate_buffer_size(limit);
 
     match encoding {
-        #[cfg(feature = "flate2")]
-        ContentEncoding::Gzip => {
-            let mut decoder = flate2::write::GzDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
-                decoder.flush().map_err(|error| BodyReadError::GzipError(error))?;
-
-                notify.send(chunk.len());
-
-                if limit < decoder.get_ref().len() {
-                    let _ = decoder.try_finish();
-                    return Err(BodyReadError::Overflow(decoder.get_mut().freeze()));
-                }
-            }
-
-            decoder.try_finish().map_err(|error| BodyReadError::GzipError(error))?;
-            Ok(decoder.get_mut().freeze())
+        #[cfg(feature = "compu")]
+        ContentEncoding::Brotli => {
+            impl_compu_bytes!(compu::decoder::brotli::BrotliDecoder::default(), body, limit);
         },
-        #[cfg(feature = "flate2")]
+        #[cfg(feature = "compu")]
+        ContentEncoding::Gzip => {
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Gzip);
+            impl_compu_bytes!(compu::decoder::zlib::ZlibDecoder::new(&options), body, limit);
+        },
+        #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let mut decoder = flate2::write::ZlibDecoder::new(crate::utils::BytesWriter::with_capacity(buffer_size));
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
-                decoder.flush().map_err(|error| BodyReadError::DeflateError(error))?;
-
-                notify.send(chunk.len());
-
-                if limit < decoder.get_ref().len() {
-                    let _ = decoder.try_finish();
-                    return Err(BodyReadError::Overflow(decoder.get_mut().freeze()));
-                }
-            }
-
-            decoder.try_finish().map_err(|error| BodyReadError::DeflateError(error))?;
-            Ok(decoder.get_mut().freeze())
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            impl_compu_bytes!(compu::decoder::zlib::ZlibDecoder::new(&options), body, limit);
         },
         _ => {
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
@@ -376,49 +409,31 @@ pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncodi
 pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding: ContentEncoding, mut notify: N) -> Result<File, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
-    let file = io::BufWriter::new(file);
+    let mut file = io::BufWriter::new(file);
 
-    let file = match encoding {
-        #[cfg(feature = "flate2")]
+    match encoding {
+        #[cfg(feature = "compu")]
+        ContentEncoding::Brotli => {
+            impl_compu_file!(compu::decoder::brotli::BrotliDecoder::default(), body, &mut file);
+        },
+        #[cfg(feature = "compu")]
         ContentEncoding::Gzip => {
-            let mut decoder = flate2::write::GzDecoder::new(file);
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::GzipError(error))?;
-                notify.send(chunk.len());
-            }
-
-            decoder.finish().map_err(|error| BodyReadError::GzipError(error))?
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Gzip);
+            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        #[cfg(feature = "flate2")]
+        #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let mut decoder = flate2::write::ZlibDecoder::new(file);
-
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                decoder.write_all(&chunk[..]).map_err(|error| BodyReadError::DeflateError(error))?;
-                notify.send(chunk.len());
-            }
-
-            decoder.finish().map_err(|error| BodyReadError::DeflateError(error))?
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        _ => {
-            let mut buffer = file;
+        _ => while let Some(chunk) = awaitic!(body.next()) {
+            let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
-            while let Some(chunk) = awaitic!(body.next()) {
-                let chunk = chunk.map(Into::into).map_err(Into::into)?;
-
-                match buffer.write_all(&chunk[..]) {
-                    Ok(_) => notify.send(chunk.len()),
-                    //TODO: consider how to get File without stumbling into error
-                    Err(error) => return Err(BodyReadError::FileError(buffer.into_inner().expect("To get File"), error)),
-                }
+            match file.write_all(&chunk[..]) {
+                Ok(_) => notify.send(chunk.len()),
+                //TODO: consider how to get File without stumbling into error
+                Err(error) => return Err(BodyReadError::FileError(file.into_inner().expect("To get File"), error)),
             }
-
-            buffer
         }
     };
 

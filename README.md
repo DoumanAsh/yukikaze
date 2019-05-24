@@ -23,8 +23,7 @@ Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](ht
 
 - `client` - Enables client module. By default `on`.
 - `rustls` - Enables use of `rustls` for default SSL implementation. By default `on`
-- `flate2-c` - Enables decompression using `flate2` crate with C backend. Default `on`.
-- `flate2-rust` - Enables decompression using `flate2` crate with Rust backend. Default `off`.
+- `compu` - Enables compression support. By default `on`.
 - `encoding` - Enables `encoding` crate support. Default `off`.
 - `websocket` - Enables Websocket Upgrade mechanism. Default `off`. Enables `carry_extensions` when `on`.
 - `carry_extensions` - Carries `http::Extensions` from request to resolved `Response`. Default `off`.

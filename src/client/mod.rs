@@ -120,9 +120,9 @@ impl<C: config::Config> Client<C> {
     fn apply_headers(request: &mut request::Request) {
         C::default_headers(request);
 
-        #[cfg(feature = "flate2")]
+        #[cfg(feature = "compu")]
         {
-            const DEFAULT_COMPRESS: &'static str = "gzip, deflate";
+            const DEFAULT_COMPRESS: &'static str = "br, gzip, deflate";
 
             if C::decompress() {
                 let headers = request.headers_mut();

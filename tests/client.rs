@@ -153,3 +153,89 @@ fn test_websocket_upgrade() {
     let (response, _) = rt.block_on(upgrade).expect("To validate upgrade").expect("To finish upgrade");
     assert!(response.is_upgrade());
 }
+
+#[cfg(feature = "compu")]
+#[test]
+fn should_handle_compressed_bytes() {
+    let encodings = [
+        "brotli",
+        "deflate",
+        "gzip",
+        "html",
+    ];
+
+    for encoding in encodings.iter() {
+        println!("Encoding: {}", encoding);
+        let url = format!("https://httpbin.org/{}", encoding);
+        let request = client::Request::get(url).expect("To create get request").empty();
+
+        let mut rt = get_tokio_rt();
+        let client = client::Client::default();
+
+        let mut request = client.send(request);
+        let request = unsafe { Pin::new_unchecked(&mut request) };
+        let request = futures_util::compat::Compat::new(request);
+
+        let result = rt.block_on(request);
+        let result = result.expect("To get without timeout");
+        println!("result={:?}", result);
+        let mut response = result.expect("To get without error");
+        assert!(response.is_success());
+
+        let mut body = response.text();
+        let body = unsafe { Pin::new_unchecked(&mut body) };
+        let body = futures_util::compat::Compat::new(body);
+        let result = rt.block_on(body).expect("Read body");
+        assert!(result.contains(encoding));
+        println!("Ok");
+    }
+}
+
+#[cfg(feature = "compu")]
+#[test]
+fn should_handle_compressed_file() {
+    use std::io::{Read};
+
+    let encodings = [
+        "brotli",
+        "deflate",
+        "gzip",
+        "html",
+    ];
+
+    for encoding in encodings.iter() {
+        println!("Encoding: {}", encoding);
+        let url = format!("https://httpbin.org/{}", encoding);
+        let request = client::Request::get(url).expect("To create get request").empty();
+
+        let mut rt = get_tokio_rt();
+        let client = client::Client::default();
+
+        let mut request = client.send(request);
+        let request = unsafe { Pin::new_unchecked(&mut request) };
+        let request = futures_util::compat::Compat::new(request);
+
+        let result = rt.block_on(request);
+        let result = result.expect("To get without timeout");
+        println!("result={:?}", result);
+        let mut response = result.expect("To get without error");
+        assert!(response.is_success());
+
+        let file = std::fs::File::create(encoding).expect("To create file");
+
+        let mut body = response.file(file);
+        let body = unsafe { Pin::new_unchecked(&mut body) };
+        let body = futures_util::compat::Compat::new(body);
+        let file = rt.block_on(body).expect("Read body");
+
+        drop(file);
+        let mut file = std::fs::File::open(encoding).expect("To open file");
+        let mut result = String::new();
+        file.read_to_string(&mut result).expect("To read file");
+        assert!(result.contains(encoding));
+
+        let _ = std::fs::remove_file(&encoding);
+
+        println!("Ok");
+    }
+}

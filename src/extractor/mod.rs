@@ -26,12 +26,13 @@ pub enum BodyReadError {
     #[display(fmt = "Failed to extract JSON. Error: {}", "_0")]
     ///Json serialization error.
     JsonError(serde_json::error::Error),
-    #[display(fmt = "Failed to decompress(deflate) content. Error: {}", "_0")]
-    ///Error happened during deflate decompression.
-    DeflateError(io::Error),
-    #[display(fmt = "Failed to decompress(gzip) content. Error: {}", "_0")]
-    ///Error happened during gzip decompression.
-    GzipError(io::Error),
+    #[cfg(feature = "compu")]
+    #[display(fmt = "Failed to decompress content. Error: {:?}", "_0")]
+    ///Error happened during decompression.
+    CompuError(compu::decoder::DecoderResult),
+    #[display(fmt = "Failed to decompress content as it is not complete")]
+    ///Failed to decompress content as it is not complete.
+    IncompleteDecompression,
     #[display(fmt = "Error file writing response into file. Error: {}", "_1")]
     ///Error happened when writing to file.
     FileError(fs::File, io::Error),
