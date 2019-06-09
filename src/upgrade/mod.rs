@@ -29,7 +29,7 @@ pub(crate) type UpgradeRes = Result<(hyper::Response<hyper::Body>, hyper::upgrad
 pub async fn upgrade_response(parts: http::response::Parts, body: hyper::upgrade::OnUpgrade) -> UpgradeRes {
     let upgrade = futures_util::compat::Compat01As03::new(body);
 
-    awaitic!(upgrade).map(|upgraded| {
+    amatsu!(upgrade).map(|upgraded| {
         let response = hyper::Response::from_parts(parts, hyper::Body::empty());
         (response, upgraded)
     })

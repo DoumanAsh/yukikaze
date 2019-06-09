@@ -15,16 +15,16 @@
 //!```rust, no_run
 //!#![feature(async_await)]
 //!
-//!use yukikaze::{awaitic, client};
+//!use yukikaze::{amatsu, client};
 //!
 //!async fn example() {
 //!    let client = client::Client::default();
 //!
 //!    let req = client::Request::get("https://google.com").expect("To create request").empty();
-//!    let mut result = awaitic!(client.send(req)).expect("Not timedout").expect("Successful");
+//!    let mut result = amatsu!(client.send(req)).expect("Not timedout").expect("Successful");
 //!    assert!(result.is_success());
 //!
-//!    let html = awaitic!(result.text()).expect("To read HTML");
+//!    let html = amatsu!(result.text()).expect("To read HTML");
 //!    println!("Google page:\n{}", html);
 //!}
 //!```
@@ -33,7 +33,7 @@
 //!
 //!```rust, no_run
 //!#![feature(async_await)]
-//!use yukikaze::{awaitic, client};
+//!use yukikaze::{amatsu, client};
 //!
 //!use core::time;
 //!
@@ -57,7 +57,7 @@
 //!    let client = client::Client::<TimeoutCfg>::new();
 //!
 //!    let req = client::Request::get("https://google.com").expect("To create request").empty();
-//!    let result = awaitic!(client.send(req)).expect("Not timedout").expect("Successful");
+//!    let result = amatsu!(client.send(req)).expect("Not timedout").expect("Successful");
 //!    assert!(result.is_success());
 //!}
 //!```
@@ -145,11 +145,11 @@ impl<C: config::Config> Client<C> {
 
         #[cfg(feature = "carry_extensions")]
         {
-            awaitic!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))
+            amatsu!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))
         }
         #[cfg(not(feature = "carry_extensions"))]
         {
-            awaitic!(ongoing)
+            amatsu!(ongoing)
         }
     }
 
@@ -172,18 +172,18 @@ impl<C: config::Config> Client<C> {
         let timeout = C::timeout();
         match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
             #[cfg(not(feature = "carry_extensions"))]
-            true => Ok(awaitic!(ongoing)),
+            true => Ok(amatsu!(ongoing)),
             #[cfg(feature = "carry_extensions")]
-            true => Ok(awaitic!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))),
+            true => Ok(amatsu!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))),
             false => {
                 let job = async_timer::Timed::<_, C::Timer>::new(ongoing, timeout);
                 #[cfg(not(feature = "carry_extensions"))]
                 {
-                    awaitic!(job)
+                    amatsu!(job)
                 }
                 #[cfg(feature = "carry_extensions")]
                 {
-                    awaitic!(job).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
+                    amatsu!(job).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
                 }
             }
         }
@@ -199,7 +199,7 @@ impl<C: config::Config> Client<C> {
     pub async fn send_redirect(&'static self, req: request::Request) -> Result<RequestResult, async_timer::timed::Expired<impl Future<Output=RequestResult> + 'static, C::Timer>> {
         let timeout = C::timeout();
         match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
-            true => Ok(awaitic!(self.redirect_request(req))),
+            true => Ok(amatsu!(self.redirect_request(req))),
             false => {
                 //Note on unsafety.
                 //Here we assume that all references to self, as it is being 'static will be safe
@@ -208,7 +208,7 @@ impl<C: config::Config> Client<C> {
                 //around so it is a bit unsafe in some edgy cases.
                 let ongoing = self.redirect_request(req);
                 let job = unsafe { async_timer::Timed::<_, C::Timer>::new_unchecked(ongoing, timeout) };
-                awaitic!(job)
+                amatsu!(job)
             }
         }
     }
@@ -231,7 +231,7 @@ impl<C: config::Config> Client<C> {
         loop {
             let ongoing = self.inner.request(req.into());
             let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
-            let res = awaitic!(ongoing)?;
+            let res = amatsu!(ongoing)?;
 
             match res.status() {
                 StatusCode::SEE_OTHER => {

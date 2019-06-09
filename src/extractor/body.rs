@@ -31,7 +31,7 @@ macro_rules! impl_compu_bytes {
 
         let mut decoder = compu::decompressor::memory::Decompressor::new($decoder);
 
-        while let Some(chunk) = awaitic!($body.next()) {
+        while let Some(chunk) = amatsu!($body.next()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match decoder.push(&chunk) {
@@ -55,7 +55,7 @@ macro_rules! impl_compu_bytes {
 
         let mut decoder = compu::decompressor::memory::Decompressor::new($decoder);
 
-        while let Some(chunk) = awaitic!($body.next()) {
+        while let Some(chunk) = amatsu!($body.next()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             $notify.send(chunk.len());
@@ -84,7 +84,7 @@ macro_rules! impl_compu_file {
 
         let mut decoder = compu::decompressor::write::Decompressor::new($decoder, $file);
 
-        while let Some(chunk) = awaitic!($body.next()) {
+        while let Some(chunk) = amatsu!($body.next()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match decoder.push(&chunk)? {
@@ -104,7 +104,7 @@ macro_rules! impl_compu_file {
 
         let mut decoder = compu::decompressor::write::Decompressor::new($decoder, $file);
 
-        while let Some(chunk) = awaitic!($body.next()) {
+        while let Some(chunk) = amatsu!($body.next()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             $notify.send(chunk.len());
@@ -153,7 +153,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
         _ => {
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
 
-            while let Some(chunk) = awaitic!(body.next()) {
+            while let Some(chunk) = amatsu!(body.next()) {
                 let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 buffer.extend_from_slice(&chunk[..]);
@@ -177,7 +177,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
 pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
-    let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
+    let bytes = amatsu!(raw_bytes(body, encoding, limit))?;
 
     String::from_utf8(bytes.to_vec()).map_err(|error| error.into())
 }
@@ -194,7 +194,7 @@ pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usi
 pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
 {
-    let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
+    let bytes = amatsu!(raw_bytes(body, encoding, limit))?;
 
     match charset.decode(&bytes) {
         (result, _, false) => Ok(result.into_owned()),
@@ -212,7 +212,7 @@ pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Op
 pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
-    let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
+    let bytes = amatsu!(raw_bytes(body, encoding, limit))?;
 
     serde_json::from_slice(&bytes).map_err(BodyReadError::from)
 }
@@ -229,7 +229,7 @@ pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<
 pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
-    let bytes = awaitic!(raw_bytes(body, encoding, limit))?;
+    let bytes = amatsu!(raw_bytes(body, encoding, limit))?;
 
     match charset.decode(&bytes) {
         (result, _, false) => serde_json::from_str(&result).map_err(BodyReadError::from),
@@ -264,7 +264,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
             let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
             impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        _ => while let Some(chunk) = awaitic!(body.next()) {
+        _ => while let Some(chunk) = amatsu!(body.next()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match file.write_all(&chunk[..]) {
@@ -314,7 +314,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
         _ => {
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
 
-            while let Some(chunk) = awaitic!(body.next()) {
+            while let Some(chunk) = amatsu!(body.next()) {
                 let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 buffer.extend_from_slice(&chunk[..]);
@@ -339,7 +339,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
 pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
 {
-    let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
+    let bytes = amatsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
     String::from_utf8(bytes.to_vec()).map_err(|error| error.into())
 }
@@ -356,7 +356,7 @@ pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncodin
 pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<String, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, N: Notifier,
 {
-    let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
+    let bytes = amatsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
     match charset.decode(&bytes) {
         (result, _, false) => Ok(result.into_owned()),
@@ -374,7 +374,7 @@ pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding,
 pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
-    let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
+    let bytes = amatsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
     serde_json::from_slice(&bytes).map_err(BodyReadError::from)
 }
@@ -391,7 +391,7 @@ pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limi
 pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<J, BodyReadError>
     where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
-    let bytes = awaitic!(raw_bytes_notify(body, encoding, limit, notify))?;
+    let bytes = amatsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
     match charset.decode(&bytes) {
         (result, _, false) => serde_json::from_str(&result).map_err(BodyReadError::from),
@@ -426,7 +426,7 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
             let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
             impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        _ => while let Some(chunk) = awaitic!(body.next()) {
+        _ => while let Some(chunk) = amatsu!(body.next()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match file.write_all(&chunk[..]) {

@@ -352,7 +352,7 @@ impl Response {
         }
 
         let (head, body) = self.inner.into_parts();
-        Ok(match awaitic!(upgrade::upgrade_response(head, body.on_upgrade())) {
+        Ok(match amatsu!(upgrade::upgrade_response(head, body.on_upgrade())) {
             Ok((hyper, body)) => Ok((Self::new(hyper), body)),
             Err(err) => Err(err),
         })

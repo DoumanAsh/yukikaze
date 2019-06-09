@@ -9,7 +9,7 @@ const SMOL_CAPCITY: usize = 64;
 ///Await future in async context.
 ///
 ///Because `.await` is retarded.
-macro_rules! awaitic {
+macro_rules! amatsu {
     ($exp:expr) => {
         ($exp).await
     }
