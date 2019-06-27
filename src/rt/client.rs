@@ -40,7 +40,7 @@
 //!                                                .empty()
 //!                                                .global()
 //!                                                .send();
-//!    let result = yukikaze::amatsu!(res).expect("To get without timeout")
+//!    let result = yukikaze::matsu!(res).expect("To get without timeout")
 //!                                       .expect("Successful response");
 //!    assert!(result.is_success());
 //!}
