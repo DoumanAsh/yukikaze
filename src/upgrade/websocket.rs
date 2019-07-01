@@ -1,5 +1,6 @@
 //! Websocket upgrade module
 
+use core::mem;
 use core::ops::Deref;
 use std::error::Error;
 
@@ -89,7 +90,8 @@ impl super::Upgrade for WebsocketUpgrade {
     type Options = Option<WebsocketUpgradeOpts>;
 
     fn prepare_request(headers: &mut http::HeaderMap, extensions: &mut http::Extensions, options: Self::Options) {
-        let sec_key: [u8; 16] = rand::random();
+        let mut sec_key: [u8; 16] = unsafe { mem::uninitialized() };
+        let _ = getrandom::getrandom(&mut sec_key);
 
         let encode_len = BASE64.encode_len(sec_key.len());
         let mut key = bytes::BytesMut::with_capacity(encode_len);
