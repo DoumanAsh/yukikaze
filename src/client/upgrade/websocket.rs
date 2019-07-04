@@ -130,7 +130,8 @@ impl super::Upgrade for WebsocketUpgrade {
     type Options = Option<WebsocketUpgradeOpts>;
 
     fn prepare_request(mut req: request::Builder, options: Self::Options) -> request::Request {
-        let sec_key: [u8; 16] = rand::random();
+        let mut sec_key: [u8; 16] = unsafe { mem::uninitialized() };
+        let _ = getrandom::getrandom(&mut sec_key);
 
         let encode_len = BASE64.encode_len(sec_key.len());
         let mut key = bytes::BytesMut::with_capacity(encode_len);
