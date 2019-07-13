@@ -5,13 +5,14 @@ use core::time;
 
 use crate::utils;
 use crate::header;
+use crate::tls::Connector;
 
 ///Default timer, which is used by [DefaultCfg](struct.DefaultCfg.html)
 pub type DefaultTimer = async_timer::oneshot::Timer;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "rustls-on")]
 ///Default connector, which is used by [DefaultCfg](struct.DefaultCfg.html)
-pub type DefaultConnector = hyper_rustls::HttpsConnector<hyper::client::HttpConnector>;
-#[cfg(not(feature = "rustls"))]
+pub type DefaultConnector = crate::tls::rustls::HttpsConnector<hyper::client::HttpConnector, hyper::client::connect::dns::GaiResolver>;
+#[cfg(not(feature = "rustls-on"))]
 ///Default connector, which is used by [DefaultCfg](struct.DefaultCfg.html)
 pub type DefaultConnector = hyper::client::HttpConnector;
 
@@ -19,9 +20,9 @@ pub type DefaultConnector = hyper::client::HttpConnector;
 ///
 ///Each method describes single aspect of configuration
 ///and provided with sane defaults
-pub trait Config {
+pub trait Config<R=hyper::client::connect::dns::GaiResolver> where R: hyper::client::connect::dns::Resolve + Clone + Send + Sync {
     ///Connector type.
-    type Connector: hyper::client::connect::Connect;
+    type Connector: Connector<R>;
     ///Timer type.
     type Timer: async_timer::oneshot::Oneshot;
 
@@ -115,6 +116,6 @@ impl Config for DefaultCfg {
     ///
     ///Uses 4 threads by default.
     fn new_connector() -> Self::Connector {
-        Self::Connector::new(4)
+        Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
     }
 }

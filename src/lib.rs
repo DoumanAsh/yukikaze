@@ -40,6 +40,7 @@ pub mod upgrade;
 pub mod client;
 #[macro_use]
 pub mod rt;
+pub mod tls;
 
 pub extern crate lazy_static;
 pub extern crate bytes;

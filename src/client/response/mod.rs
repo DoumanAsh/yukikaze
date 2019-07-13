@@ -235,7 +235,6 @@ impl Response {
     ///Extracts Response's body as raw bytes.
     pub fn body(&mut self) -> impl Future<Output=Result<bytes::Bytes, extractor::BodyReadError>> {
         let (encoding, buffer_size, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         extractor::raw_bytes(body, encoding, buffer_size)
     }
@@ -243,7 +242,6 @@ impl Response {
     ///Extracts Response's body as text
     pub fn text(&mut self) -> impl Future<Output=Result<String, extractor::BodyReadError>> {
         let (encoding, buffer_size, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         #[cfg(feature = "encoding")]
         {
@@ -260,7 +258,6 @@ impl Response {
     ///Extracts Response's body as JSON
     pub fn json<J: serde::de::DeserializeOwned>(&mut self) -> impl Future<Output=Result<J, extractor::BodyReadError>> {
         let (encoding, buffer_size, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         #[cfg(feature = "encoding")]
         {
@@ -283,7 +280,6 @@ impl Response {
         }
 
         let (encoding, _, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         extractor::file(file, body, encoding)
     }
@@ -291,7 +287,6 @@ impl Response {
     ///Extracts Response's body as raw bytes.
     pub fn body_notify<N: extractor::Notifier>(&mut self, notify: N) -> impl Future<Output=Result<bytes::Bytes, extractor::BodyReadError>> {
         let (encoding, buffer_size, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         extractor::raw_bytes_notify(body, encoding, buffer_size, notify)
     }
@@ -299,7 +294,6 @@ impl Response {
     ///Extracts Response's body as text
     pub fn text_notify<N: extractor::Notifier>(&mut self, notify: N) -> impl Future<Output=Result<String, extractor::BodyReadError>> {
         let (encoding, buffer_size, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         #[cfg(feature = "encoding")]
         {
@@ -316,7 +310,6 @@ impl Response {
     ///Extracts Response's body as JSON
     pub fn json_notify<N: extractor::Notifier, J: serde::de::DeserializeOwned>(&mut self, notify: N) -> impl Future<Output=Result<J, extractor::BodyReadError>> {
         let (encoding, buffer_size, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         #[cfg(feature = "encoding")]
         {
@@ -339,7 +332,6 @@ impl Response {
         }
 
         let (encoding, _, body) = self.extract_body();
-        let body = futures_util::compat::Compat01As03::new(body);
 
         extractor::file_notify(file, body, encoding, notify)
     }

@@ -12,6 +12,21 @@ pub enum Either<A, B> {
     Right(B),
 }
 
+unsafe impl<A: Sync, B: Sync> Sync for Either<A, B> {}
+unsafe impl<A: Send, B: Send> Send for Either<A, B> {}
+impl<A: Unpin, B: Unpin> Unpin for Either<A, B> {}
+
+impl<A: Unpin, B: Unpin> Future for Either<A, B> where A: Future, B: Future<Output = A::Output> {
+    type Output = A::Output;
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        match *self {
+            Either::Left(ref mut left) => Future::poll(Pin::new(left), ctx),
+            Either::Right(ref mut right) => Future::poll(Pin::new(right), ctx),
+        }
+    }
+}
+
 ///Create pair of future that being processed together.
 ///
 ///First goes left, then  right.

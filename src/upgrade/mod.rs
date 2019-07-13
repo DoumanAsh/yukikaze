@@ -27,9 +27,7 @@ pub(crate) type UpgradeRes = Result<(hyper::Response<hyper::Body>, hyper::upgrad
 #[cfg(feature = "client")]
 ///Utility to upgrade using hyper's upgrade mechanism
 pub async fn upgrade_response(parts: http::response::Parts, body: hyper::upgrade::OnUpgrade) -> UpgradeRes {
-    let upgrade = futures_util::compat::Compat01As03::new(body);
-
-    matsu!(upgrade).map(|upgraded| {
+    matsu!(body).map(|upgraded| {
         let response = hyper::Response::from_parts(parts, hyper::Body::empty());
         (response, upgraded)
     })

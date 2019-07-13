@@ -22,7 +22,8 @@
 //!        type Timer = client::config::DefaultTimer;
 //!
 //!        fn new_connector() -> Self::Connector {
-//!            Self::Connector::new(4)
+//!            use yukikaze::tls::Connector;
+//!            Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
 //!        }
 //!
 //!        fn timeout() -> time::Duration {

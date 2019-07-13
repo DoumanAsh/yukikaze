@@ -44,7 +44,8 @@
 //!    type Timer = client::config::DefaultTimer;
 //!
 //!    fn new_connector() -> Self::Connector {
-//!        Self::Connector::new(4)
+//!        use yukikaze::tls::Connector;
+//!        Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
 //!    }
 //!
 //!    fn timeout() -> time::Duration {
@@ -63,7 +64,7 @@
 //!```
 
 use hyper::client::connect::Connect;
-use futures_util::future::FutureExt;
+use futures_util::FutureExt;
 
 use core::marker::PhantomData;
 use core::future::Future;
@@ -141,15 +142,15 @@ impl<C: config::Config> Client<C> {
         let mut extensions = req.extract_extensions();
 
         let ongoing = self.inner.request(req.into());
-        let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
+        let ongoing = matsu!(ongoing).map(|res| response::Response::new(res));
 
         #[cfg(feature = "carry_extensions")]
         {
-            matsu!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))
+            ongoing.map(move |resp| resp.replace_extensions(&mut extensions))
         }
         #[cfg(not(feature = "carry_extensions"))]
         {
-            matsu!(ongoing)
+            ongoing
         }
     }
 
@@ -166,8 +167,7 @@ impl<C: config::Config> Client<C> {
         #[cfg(feature = "carry_extensions")]
         let mut extensions = req.extract_extensions();
 
-        let ongoing = self.inner.request(req.into());
-        let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
+        let ongoing = self.inner.request(req.into()).map(|res| res.map(|resp| response::Response::new(resp)));
 
         let timeout = C::timeout();
         match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
@@ -230,8 +230,7 @@ impl<C: config::Config> Client<C> {
 
         loop {
             let ongoing = self.inner.request(req.into());
-            let ongoing = futures_util::compat::Compat01As03::new(ongoing).map(|res| res.map(|resp| response::Response::new(resp)));
-            let res = matsu!(ongoing)?;
+            let res = matsu!(ongoing).map(|resp| response::Response::new(resp))?;
 
             match res.status() {
                 StatusCode::SEE_OTHER => {

@@ -1,7 +1,8 @@
-use yukikaze::client;
+#![feature(async_await)]
+
+use yukikaze::{matsu, client};
 
 use core::time;
-use core::pin::Pin;
 
 const BIN_URL: &'static str = "https://httpbin.org";
 const BIN_GET: &'static str = "https://httpbin.org/get";
@@ -13,34 +14,28 @@ impl client::config::Config for TimeoutCfg {
     type Timer = client::config::DefaultTimer;
 
     fn new_connector() -> Self::Connector {
-        Self::Connector::new(4)
+        use yukikaze::tls::Connector;
+        Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
     }
 
     fn timeout() -> time::Duration {
-        time::Duration::from_millis(50)
+        time::Duration::from_millis(30)
     }
 }
 
-fn get_tokio_rt() -> tokio::runtime::current_thread::Runtime {
-    tokio::runtime::current_thread::Runtime::new().expect("Build tokio runtime")
-}
-
+#[tokio::test]
 #[test]
-fn should_time_out() {
-    let mut rt = get_tokio_rt();
-
+async fn should_time_out() {
     let client = client::Client::<TimeoutCfg>::new();
 
     let request = client::request::Request::get(BIN_GET).expect("To create get request").empty();
-    let mut request = client.send(request);
-    let request = unsafe { Pin::new_unchecked(&mut request) };
-    let request = futures_util::compat::Compat::new(request);
-    let result = rt.block_on(request);
+    let result = matsu!(client.send(request));
     assert!(result.is_err());
 }
 
+#[tokio::test]
 #[test]
-fn should_handle_redirect() {
+async fn should_handle_redirect() {
     pub struct SmolRedirect;
 
     impl client::config::Config for SmolRedirect {
@@ -48,7 +43,8 @@ fn should_handle_redirect() {
         type Timer = client::config::DefaultTimer;
 
         fn new_connector() -> Self::Connector {
-            Self::Connector::new(4)
+            use yukikaze::tls::Connector;
+            Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
         }
 
         fn max_redirect_num() -> usize {
@@ -60,36 +56,27 @@ fn should_handle_redirect() {
     const BIN_REL_REDIRECT_2: &'static str = "http://httpbin.org/redirect/2";
     const BIN_ABS_REDIRECT_3: &'static str = "http://httpbin.org/absolute-redirect/3";
 
-    let mut rt = get_tokio_rt();
     let client = client::Client::<SmolRedirect>::new();
 
     let request = client::Request::get(BIN_ABS_REDIRECT_2).expect("To create get request").empty();
-    let mut request = client.redirect_request(request);
-    let request = unsafe { Pin::new_unchecked(&mut request) };
-    let request = futures_util::compat::Compat::new(request);
-    let result = rt.block_on(request);
+    let result = matsu!(client.redirect_request(request));
     let result = result.expect("To get successful response");
     assert!(result.is_success());
 
     let request = client::Request::get(BIN_REL_REDIRECT_2).expect("To create get request").empty();
-    let mut request = client.redirect_request(request);
-    let request = unsafe { Pin::new_unchecked(&mut request) };
-    let request = futures_util::compat::Compat::new(request);
-    let result = rt.block_on(request);
+    let result = matsu!(client.redirect_request(request));
     let result = result.expect("To get successful response");
     assert!(result.is_success());
 
     let request = client::Request::get(BIN_ABS_REDIRECT_3).expect("To create get request").empty();
-    let mut request = client.redirect_request(request);
-    let request = unsafe { Pin::new_unchecked(&mut request) };
-    let request = futures_util::compat::Compat::new(request);
-    let result = rt.block_on(request);
+    let result = matsu!(client.redirect_request(request));
     let result = result.expect("To get successful response");
     assert!(result.is_redirect());
 }
 
+#[tokio::test]
 #[test]
-fn make_request() {
+async fn make_request() {
     let request = client::Request::get(BIN_URL).expect("To create get request")
                                                .bearer_auth("lolka")
                                                .basic_auth("Lolka", Some("Pass"))
@@ -105,13 +92,9 @@ fn make_request() {
         assert_eq!(auth, "Basic TG9sa2E6UGFzcw==");
     }
 
-    let mut rt = get_tokio_rt();
     let client = client::Client::default();
 
-    let mut request = client.send(request);
-    let request = unsafe { Pin::new_unchecked(&mut request) };
-    let request = futures_util::compat::Compat::new(request);
-    let result = rt.block_on(request);
+    let result = matsu!(client.send(request));
     let result = result.expect("To get without timeout");
     println!("result={:?}", result);
     let mut result = result.expect("To get without error");
@@ -120,43 +103,37 @@ fn make_request() {
     assert!(!result.is_error());
     assert!(result.is_success());
 
-    let mut body = result.text();
-    let body = unsafe { Pin::new_unchecked(&mut body) };
-    let body = futures_util::compat::Compat::new(body);
-    let _result = rt.block_on(body).expect("Read body");
+    let res = matsu!(result.text());
+    assert!(res.is_ok());
 }
 
 #[cfg(feature = "websocket")]
+#[tokio::test]
 #[test]
-fn test_websocket_upgrade() {
+async fn test_websocket_upgrade() {
     const WS_TEST: &str = "http://echo.websocket.org/?encoding=text";
 
     let request = client::request::Request::get(WS_TEST).expect("Error with request!")
                                                         .upgrade(yukikaze::upgrade::WebsocketUpgrade, None);
 
     println!("request={:?}", request);
-    let mut rt = get_tokio_rt();
     let client = client::Client::default();
 
-    let mut request = client.send(request);
-    let request = unsafe { Pin::new_unchecked(&mut request) };
-    let request = futures_util::compat::Compat::new(request);
-    let result = rt.block_on(request);
+    let result = matsu!(client.send(request));
     let result = result.expect("To get without timeout");
     println!("result={:?}", result);
     let response = result.expect("To get without error");
     assert!(response.is_upgrade());
 
-    let mut upgrade = response.upgrade(yukikaze::upgrade::WebsocketUpgrade);
-    let upgrade = unsafe { Pin::new_unchecked(&mut upgrade) };
-    let upgrade = futures_util::compat::Compat::new(upgrade);
-    let (response, _) = rt.block_on(upgrade).expect("To validate upgrade").expect("To finish upgrade");
+    let upgrade = matsu!(response.upgrade(yukikaze::upgrade::WebsocketUpgrade));
+    let (response, _) = upgrade.expect("To validate upgrade").expect("To finish upgrade");
     assert!(response.is_upgrade());
 }
 
 #[cfg(feature = "compu")]
+#[tokio::test]
 #[test]
-fn should_handle_compressed_bytes() {
+async fn should_handle_compressed_bytes() {
     let encodings = [
         "brotli",
         "deflate",
@@ -169,31 +146,23 @@ fn should_handle_compressed_bytes() {
         let url = format!("https://httpbin.org/{}", encoding);
         let request = client::Request::get(url).expect("To create get request").empty();
 
-        let mut rt = get_tokio_rt();
         let client = client::Client::default();
 
-        let mut request = client.send(request);
-        let request = unsafe { Pin::new_unchecked(&mut request) };
-        let request = futures_util::compat::Compat::new(request);
-
-        let result = rt.block_on(request);
-        let result = result.expect("To get without timeout");
+        let result = matsu!(client.send(request)).expect("To get without timeout");
         println!("result={:?}", result);
         let mut response = result.expect("To get without error");
         assert!(response.is_success());
 
-        let mut body = response.text();
-        let body = unsafe { Pin::new_unchecked(&mut body) };
-        let body = futures_util::compat::Compat::new(body);
-        let result = rt.block_on(body).expect("Read body");
+        let result = matsu!(response.text()).expect("Read body");
         assert!(result.contains(encoding));
         println!("Ok");
     }
 }
 
 #[cfg(feature = "compu")]
+#[tokio::test]
 #[test]
-fn should_handle_compressed_file() {
+async fn should_handle_compressed_file() {
     use std::io::{Read};
 
     let encodings = [
@@ -208,25 +177,16 @@ fn should_handle_compressed_file() {
         let url = format!("https://httpbin.org/{}", encoding);
         let request = client::Request::get(url).expect("To create get request").empty();
 
-        let mut rt = get_tokio_rt();
         let client = client::Client::default();
 
-        let mut request = client.send(request);
-        let request = unsafe { Pin::new_unchecked(&mut request) };
-        let request = futures_util::compat::Compat::new(request);
-
-        let result = rt.block_on(request);
-        let result = result.expect("To get without timeout");
+        let result = matsu!(client.send(request)).expect("To get without timeout");
         println!("result={:?}", result);
         let mut response = result.expect("To get without error");
         assert!(response.is_success());
 
         let file = std::fs::File::create(encoding).expect("To create file");
 
-        let mut body = response.file(file);
-        let body = unsafe { Pin::new_unchecked(&mut body) };
-        let body = futures_util::compat::Compat::new(body);
-        let file = rt.block_on(body).expect("Read body");
+        let file = matsu!(response.file(file)).expect("Read body");
 
         drop(file);
         let mut file = std::fs::File::open(encoding).expect("To open file");
