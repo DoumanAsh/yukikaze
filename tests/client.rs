@@ -24,7 +24,6 @@ impl client::config::Config for TimeoutCfg {
 }
 
 #[tokio::test]
-#[test]
 async fn should_time_out() {
     let client = client::Client::<TimeoutCfg>::new();
 
@@ -34,7 +33,6 @@ async fn should_time_out() {
 }
 
 #[tokio::test]
-#[test]
 async fn should_handle_redirect() {
     pub struct SmolRedirect;
 
@@ -75,7 +73,6 @@ async fn should_handle_redirect() {
 }
 
 #[tokio::test]
-#[test]
 async fn make_request() {
     let request = client::Request::get(BIN_URL).expect("To create get request")
                                                .bearer_auth("lolka")
@@ -109,7 +106,6 @@ async fn make_request() {
 
 #[cfg(feature = "websocket")]
 #[tokio::test]
-#[test]
 async fn test_websocket_upgrade() {
     const WS_TEST: &str = "http://echo.websocket.org/?encoding=text";
 
@@ -132,7 +128,6 @@ async fn test_websocket_upgrade() {
 
 #[cfg(feature = "compu")]
 #[tokio::test]
-#[test]
 async fn should_handle_compressed_bytes() {
     let encodings = [
         "brotli",
@@ -161,7 +156,6 @@ async fn should_handle_compressed_bytes() {
 
 #[cfg(feature = "compu")]
 #[tokio::test]
-#[test]
 async fn should_handle_compressed_file() {
     use std::io::{Read};
 
@@ -202,7 +196,6 @@ async fn should_handle_compressed_file() {
 
 #[cfg(feature = "encoding")]
 #[tokio::test]
-#[test]
 async fn decode_non_utf8() {
     const URI: &str = "http://seiya-saiga.com/game/kouryaku.html";
     let request = client::Request::get(URI).expect("To create get request").empty();
