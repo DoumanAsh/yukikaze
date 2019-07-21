@@ -199,3 +199,23 @@ async fn should_handle_compressed_file() {
         println!("Ok");
     }
 }
+
+#[cfg(feature = "encoding")]
+#[tokio::test]
+#[test]
+async fn decode_non_utf8() {
+    const URI: &str = "http://seiya-saiga.com/game/kouryaku.html";
+    let request = client::Request::get(URI).expect("To create get request").empty();
+
+    let client = client::Client::default();
+
+    let result = matsu!(client.send(request)).expect("To get without timeout");
+    println!("result={:?}", result);
+    let mut response = result.expect("To get without error");
+    assert!(response.is_success());
+    //Pretend that it acctually sets Content-Type correctly
+    response.headers_mut().insert(yukikaze::header::CONTENT_TYPE, yukikaze::header::HeaderValue::from_static("text/html; charset=shift_jis"));
+
+    let res = matsu!(response.text());
+    assert!(res.is_ok());
+}
