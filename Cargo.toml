@@ -34,7 +34,7 @@ compu = { version = "0.3", optional = true }
 lazy_static = "1"
 
 rustls = { version = "0.15", optional = true }
-tokio-rustls = { git = "https://github.com/DoumanAsh/tokio-rustls", branch = "tokio-0.2", optional = true }
+tokio-rustls = { git = "https://github.com/quininer/tokio-rustls", branch = "tokio-0.2", optional = true }
 tokio-io = { git = "https://github.com/tokio-rs/tokio", default-features = false, optional = true }
 webpki = { version = "0.19", optional = true }
 webpki-roots = { version = "0.16", optional = true }
