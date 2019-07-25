@@ -7,7 +7,6 @@ use hyper::client::connect::dns::Resolve;
 use futures_util::{TryFutureExt, FutureExt};
 
 use super::super::Connector;
-use crate::utils::fut::Either;
 
 use std::io;
 use std::sync::Arc;
@@ -107,7 +106,7 @@ impl<R, C> fmt::Debug for HttpsConnector<C, R> {
 impl<R: Resolve + Clone + Send + Sync, C: Connector<R>> Connect for HttpsConnector<C, R> where R::Future: Send, <C as Connect>::Future: 'static {
     type Transport = MaybeHttpsStream<<C as Connect>::Transport>;
     type Error = Box<dyn std::error::Error + Send + Sync>;
-    type Future = Box<dyn Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send>;
+    existential type Future: Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
         use rustls::Session;
@@ -130,11 +129,11 @@ impl<R: Resolve + Clone + Send + Sync, C: Connector<R>> Connect for HttpsConnect
 
                 }).err_into());
 
-                Box::new(fut)
+                crate::utils::fut::Either::Left(fut)
             },
             false => {
                 let fut = self.http.connect(dst).map(|res| res.map(|(tcp, conn)| (MaybeHttpsStream::Http(tcp), conn)).map_err(Into::into));
-                Box::new(fut)
+                crate::utils::fut::Either::Right(fut)
             }
         }
     }
