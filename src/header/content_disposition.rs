@@ -35,7 +35,7 @@ impl Filename {
     ///Note that actual encoding would happen only when header is written.
     ///The value itself would remain unchanged in the `Filename`.
     pub fn with_encoded_name(name: String) -> Self {
-        let is_non_ascii = name.as_bytes().iter().any(|byte| PATH_SEGMENT_ENCODE_SET.contains(*byte));
+        let is_non_ascii = name.as_bytes().iter().any(|byte| !byte.is_ascii() && PATH_SEGMENT_ENCODE_SET.contains(*byte));
 
         match is_non_ascii {
             false => Self::with_name(name),
@@ -224,7 +224,7 @@ impl fmt::Display for ContentDisposition {
                     write!(f, "attachment; filename*={}'{}'{}",
                            charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET).to_string())
+                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET))
                 },
             },
             ContentDisposition::FormData(None, file) => match file {
@@ -234,7 +234,7 @@ impl fmt::Display for ContentDisposition {
                     write!(f, "form-data; filename*={}'{}'{}",
                            charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET).to_string())
+                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET))
                 },
             },
             ContentDisposition::FormData(Some(name), file) => match file {
@@ -245,7 +245,7 @@ impl fmt::Display for ContentDisposition {
                            name,
                            charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET).to_string())
+                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET))
                 },
             }
         }
