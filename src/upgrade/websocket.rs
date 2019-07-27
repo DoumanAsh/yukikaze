@@ -52,12 +52,13 @@ impl Deref for SecKey {
 impl SecKey {
     ///Performs validation of challenge, received in HTTP response
     pub fn validate_challenge(&self, challenge: &[u8]) -> bool {
-        let mut hasher = ring::digest::Context::new(&ring::digest::SHA1);
+        use sha1::{Sha1, Digest};
+        let mut hasher = Sha1::new();
 
-        hasher.update(&self.0);
-        hasher.update(GUID.as_bytes());
+        hasher.input(&self.0);
+        hasher.input(GUID.as_bytes());
 
-        let res = hasher.finish();
+        let res = hasher.result();
         let encoded = BASE64.encode(res.as_ref());
 
         encoded.as_bytes() == challenge

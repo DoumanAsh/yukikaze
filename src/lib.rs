@@ -54,7 +54,7 @@ pub extern crate encoding_rs;
 #[cfg(feature = "compu")]
 pub extern crate compu;
 #[cfg(feature = "websocket")]
-pub extern crate ring;
+pub extern crate sha1;
 #[cfg(feature = "client")]
 pub extern crate hyper;
 #[cfg(feature = "client")]
