@@ -147,7 +147,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
         },
         #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
             impl_compu_bytes!(compu::decoder::zlib::ZlibDecoder::new(&options), body, limit);
         },
         _ => {
@@ -261,7 +261,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
         },
         #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
             impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
         _ => while let Some(chunk) = matsu!(body.next()) {
@@ -308,7 +308,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
         },
         #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
             impl_compu_bytes!(compu::decoder::zlib::ZlibDecoder::new(&options), body, limit);
         },
         _ => {
@@ -423,7 +423,7 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
         },
         #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
-            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Deflate);
+            let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
             impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
         _ => while let Some(chunk) = matsu!(body.next()) {
