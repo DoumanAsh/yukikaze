@@ -105,7 +105,7 @@ impl<R, C> fmt::Debug for HttpsConnector<C, R> {
 impl<R: Resolve + Clone + Send + Sync, C: Connector<R>> Connect for HttpsConnector<C, R> where R::Future: Send {
     type Transport = MaybeHttpsStream<<C as Connect>::Transport>;
     type Error = Box<dyn std::error::Error + Send + Sync>;
-    existential type Future: Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
+    type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
         use rustls::Session;
