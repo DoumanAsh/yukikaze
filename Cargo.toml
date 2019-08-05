@@ -24,7 +24,7 @@ http = "0.1"
 percent-encoding = "2.1"
 bytes = "0.4"
 mime = "0.3"
-mime_guess = "^2.0.0-alpha.6"
+mime_guess = "2"
 compu = { version = "0.4", optional = true, default-features = false, features = ["brotli-c", "zlib-opt"] }
 lazy_static = "1"
 

@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use mime::Mime;
-use mime_guess::guess_mime_type;
+use mime_guess;
 
 use std::path;
 use std::fs;
@@ -83,7 +83,7 @@ impl Form {
         };
         let file_meta = file.metadata()?;
         let file_len = file_meta.len() as usize;
-        let mime = guess_mime_type(&path);
+        let mime = mime_guess::from_path(path).first_or_octet_stream();
 
         let content_disposition = ContentDisposition::FormData(Some(field_name), file_name);
         let _ = write!(&mut self.storage, "--{}\r\nContent-Disposition: {}\r\n", self.boundary, content_disposition);
