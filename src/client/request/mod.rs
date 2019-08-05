@@ -380,15 +380,16 @@ impl Builder {
     ///Adds `Content-Length` if not specified by user.
     ///Following RFC, adds zero length only for `PUT` and `POST` requests
     pub fn body<B: Into<bytes::Bytes>>(mut self, body: Option<B>) -> Request {
-        use percent_encoding::{utf8_percent_encode, USERINFO_ENCODE_SET};
+        use crate::utils::enc::USER_INFO_ENCODE_SET;
+        use percent_encoding::{utf8_percent_encode};
 
         // set cookies
         if let Some(jar) = self.cookies.take() {
             let mut buffer = utils::BytesWriter::new();
 
             for cook in jar.delta() {
-                let name = utf8_percent_encode(cook.name(), USERINFO_ENCODE_SET);
-                let value = utf8_percent_encode(cook.value(), USERINFO_ENCODE_SET);
+                let name = utf8_percent_encode(cook.name(), USER_INFO_ENCODE_SET);
+                let value = utf8_percent_encode(cook.value(), USER_INFO_ENCODE_SET);
                 let _ = write!(&mut buffer, "; {}={}", name, value);
             }
 

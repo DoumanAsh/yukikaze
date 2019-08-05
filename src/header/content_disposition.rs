@@ -1,4 +1,5 @@
-use percent_encoding::{percent_encode, PATH_SEGMENT_ENCODE_SET, percent_decode, EncodeSet};
+use percent_encoding::{utf8_percent_encode, percent_decode_str};
+use crate::utils::enc::HEADER_VALUE_ENCODE_SET;
 
 use core::fmt;
 use core::str::FromStr;
@@ -12,11 +13,12 @@ pub enum Filename {
     Name(Option<String>),
     ///Extended `filename*`
     ///
+    ///Charset is always UTF-8, because whatelse you need?
+    ///
     ///Values:
-    ///1. Charset.
-    ///2. Optional language tag.
-    ///3. Raw bytes of name.
-    Extended(String, Option<String>, Vec<u8>)
+    ///1. Optional language tag.
+    ///2. Correctly percent encoded string
+    Extended(Option<String>, String)
 }
 
 impl Filename {
@@ -34,29 +36,53 @@ impl Filename {
     ///
     ///Note that actual encoding would happen only when header is written.
     ///The value itself would remain unchanged in the `Filename`.
-    pub fn with_encoded_name(name: String) -> Self {
-        let is_non_ascii = name.as_bytes().iter().any(|byte| !byte.is_ascii() && PATH_SEGMENT_ENCODE_SET.contains(*byte));
-
-        match is_non_ascii {
-            false => Self::with_name(name),
-            true => {
-                let bytes = name.into_bytes();
-                Filename::Extended("utf-8".to_owned(), None, bytes)
+    pub fn with_encoded_name(name: std::borrow::Cow<'_, str>) -> Self {
+        match name.is_ascii() {
+            true => Self::with_name(name.into_owned()),
+            false => match utf8_percent_encode(&name, HEADER_VALUE_ENCODE_SET).into() {
+                std::borrow::Cow::Owned(encoded) => Self::with_extended(None, encoded),
+                std::borrow::Cow::Borrowed(maybe_encoded) => match maybe_encoded == name {
+                    true => Self::with_extended(None, maybe_encoded.to_owned()),
+                    false => Self::with_name(name.into_owned()),
+                }
             }
         }
     }
 
+    #[inline]
     ///Creates extended file name.
-    pub fn with_extended(charset: String, lang: Option<String>, name: Vec<u8>) -> Self {
-        Filename::Extended(charset, lang, name)
+    pub fn with_extended(lang: Option<String>, name: String) -> Self {
+        Filename::Extended(lang, name)
     }
 
     #[inline]
     ///Returns whether filename is of extended type.
     pub fn is_extended(&self) -> bool {
         match self {
-            Filename::Extended(_, _, _) => true,
+            Filename::Extended(_, _) => true,
             _ => false
+        }
+    }
+
+    ///Returns file name, percent decoded if necessary.
+    ///
+    ///Note: expects to work with utf-8 only.
+    pub fn name(&self) -> Option<std::borrow::Cow<'_, str>> {
+        match self {
+            Filename::Name(None) => None,
+            Filename::Name(Some(ref name)) => Some(name.as_str().into()),
+            Filename::Extended(_, name) => Some(percent_decode_str(&name).decode_utf8_lossy()),
+        }
+    }
+
+    ///Consumes self and returns file name, if present.
+    ///
+    ///Note: expects to work with utf-8 only.
+    pub fn into_name(self) -> Option<String> {
+        match self {
+            Filename::Name(None) => None,
+            Filename::Name(Some(name)) => Some(name),
+            Filename::Extended(_, name) => Some(percent_decode_str(&name).decode_utf8_lossy().into_owned()),
         }
     }
 }
@@ -93,17 +119,18 @@ macro_rules! parse_file_ext {
     ($param:ident) => {{
         let mut parts = $param.splitn(3, '\'');
 
-        let charset = match parts.next() {
+        //Should be utf-8, but since we parse from str, should be always utf-8
+        let _ = match parts.next() {
             Some(charset) => charset.to_owned(),
             None => continue
         };
         let lang = parts.next().map(|lang| lang.to_owned());
-        let value: Vec<u8> = match parts.next() {
-            Some(value) => percent_decode(value.as_bytes()).collect(),
+        let value = match parts.next() {
+            Some(value) => value.to_owned(),
             None => continue
         };
 
-        Filename::Extended(charset, lang, value)
+        Filename::Extended(lang, value)
     }}
 }
 
@@ -220,32 +247,29 @@ impl fmt::Display for ContentDisposition {
             ContentDisposition::Attachment(file) => match file {
                 Filename::Name(Some(name)) => write!(f, "attachment; filename=\"{}\"", name),
                 Filename::Name(None) => write!(f, "attachment"),
-                Filename::Extended(charset, lang, value) => {
-                    write!(f, "attachment; filename*={}'{}'{}",
-                           charset,
+                Filename::Extended(lang, value) => {
+                    write!(f, "attachment; filename*=utf-8'{}'{}",
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET))
+                           value)
                 },
             },
             ContentDisposition::FormData(None, file) => match file {
                 Filename::Name(Some(name)) => write!(f, "form-data; filename=\"{}\"", name),
                 Filename::Name(None) => write!(f, "form-data"),
-                Filename::Extended(charset, lang, value) => {
-                    write!(f, "form-data; filename*={}'{}'{}",
-                           charset,
+                Filename::Extended(lang, value) => {
+                    write!(f, "form-data; filename*=utf-8'{}'{}",
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET))
+                           value)
                 },
             },
             ContentDisposition::FormData(Some(name), file) => match file {
                 Filename::Name(Some(file_name)) => write!(f, "form-data; name=\"{}\"; filename=\"{}\"", name, file_name),
                 Filename::Name(None) => write!(f, "form-data; name=\"{}\"", name),
-                Filename::Extended(charset, lang, value) => {
-                    write!(f, "form-data; name=\"{}\"; filename*={}'{}'{}",
+                Filename::Extended(lang, value) => {
+                    write!(f, "form-data; name=\"{}\"; filename*=utf-8'{}'{}",
                            name,
-                           charset,
                            lang.as_ref().map(|lang| lang.as_str()).unwrap_or(""),
-                           percent_encode(&value, PATH_SEGMENT_ENCODE_SET))
+                           value)
                 },
             }
         }
@@ -254,20 +278,20 @@ impl fmt::Display for ContentDisposition {
 
 #[cfg(test)]
 mod tests {
-    use ::percent_encoding::{percent_decode};
+    use percent_encoding::{percent_decode};
     use super::{FromStr, ContentDisposition, Filename};
 
     #[test]
     fn parse_file_name_extended_ascii() {
         const INPUT: &'static str = "rori.mp4";
-        let file_name = Filename::with_encoded_name(INPUT.to_string());
+        let file_name = Filename::with_encoded_name(INPUT.into());
         assert!(!file_name.is_extended());
     }
 
     #[test]
     fn parse_file_name_extended_non_ascii() {
         const INPUT: &'static str = "ロリへんたい.mp4";
-        let file_name = Filename::with_encoded_name(INPUT.to_string());
+        let file_name = Filename::with_encoded_name(INPUT.into());
         assert!(file_name.is_extended());
     }
 
@@ -330,7 +354,7 @@ mod tests {
 
     #[test]
     fn parse_attach_disp_w_filename_ext() {
-        const EXPECT_INPUT: &'static str = "attachment; filename*=UTF-8'en'%C2%A3%20and%20%E2%82%AC%20rates";
+        const EXPECT_INPUT: &'static str = "attachment; filename*=utf-8'en'%C2%A3%20and%20%E2%82%AC%20rates";
         const INPUT: &'static str = "attachment;\t filename*=UTF-8'en'%C2%A3%20and%20%E2%82%AC%20rates";
 
         let result = ContentDisposition::from_str(INPUT).expect("To have attachment Disposition");
@@ -339,15 +363,11 @@ mod tests {
 
         match result {
             ContentDisposition::Attachment(file) => {
-                match file {
-                    Filename::Extended(charset, lang, value) => {
-                        assert_eq!(charset, "UTF-8");
-                        assert_eq!(lang.expect("Lang value"), "en");
-                        let expected_value = percent_decode("%C2%A3%20and%20%E2%82%AC%20rates".as_bytes()).collect::<Vec<u8>>();
-                        assert_eq!(value, expected_value);
-                    },
-                    _ => panic!("Wrong Filename type"),
-                }
+                assert!(file.is_extended());
+
+                let expected_value = percent_decode("%C2%A3%20and%20%E2%82%AC%20rates".as_bytes()).decode_utf8_lossy();
+                let value = file.name().expect("To have file name");
+                assert_eq!(value, expected_value);
             },
             _ => panic!("Invalid Content Disposition")
         }

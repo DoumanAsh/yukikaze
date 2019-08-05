@@ -21,7 +21,7 @@ optional = true
 
 [dependencies]
 http = "0.1"
-percent-encoding = "1.0"
+percent-encoding = "2.1"
 bytes = "0.4"
 mime = "0.3"
 mime_guess = "^2.0.0-alpha.6"

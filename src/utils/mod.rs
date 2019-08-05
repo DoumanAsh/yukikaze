@@ -36,6 +36,7 @@ macro_rules! unreach {
 }
 
 pub mod fut;
+pub mod enc;
 
 ///Convenience wrapper over `bytes::BytesMut`
 ///
