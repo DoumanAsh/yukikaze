@@ -25,7 +25,7 @@ percent-encoding = "1.0"
 bytes = "0.4"
 mime = "0.3"
 mime_guess = "^2.0.0-alpha.6"
-compu = { version = "0.4", optional = true, features = ["zlib-opt"] }
+compu = { version = "0.4", optional = true, default-features = false, features = ["brotli-c", "zlib-opt"] }
 lazy_static = "1"
 
 sha-1 = { version = "0", optional = true }
