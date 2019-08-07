@@ -5,4 +5,4 @@ pub use webpki;
 pub use webpki_roots;
 
 pub mod connector;
-pub use connector::HttpsConnector;
+pub use connector::{HttpsOnlyConnector, HttpsConnector};

@@ -138,7 +138,78 @@ impl<R: Resolve + Clone + Send + Sync, C: Connector<R>> Connect for HttpsConnect
     }
 }
 
-impl<R: Resolve + Clone + Send + Sync, T: Connector<R>> Connector<R> for HttpsConnector<T, R> where R::Future: Send, <T as Connect>::Future: 'static {
+impl<R: Resolve + Clone + Send + Sync, T: Connector<R>> Connector<R> for HttpsConnector<T, R> where R::Future: Send {
+    fn with(resolver: R) -> Self {
+        let http = T::with(resolver);
+
+        let mut config = rustls::ClientConfig::new();
+        config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+
+        Self {
+            http,
+            config: Arc::new(config),
+            _resolver: PhantomData,
+        }
+    }
+}
+
+#[derive(Clone)]
+///HTTPs only connect based on Rustls.
+///
+///Any attempt to connect over plain HTTP will result in corrupt message error.
+pub struct HttpsOnlyConnector<T, R> {
+    http: T,
+    config: Arc<rustls::ClientConfig>,
+    _resolver: PhantomData<R>,
+}
+
+impl<R: hyper::client::connect::dns::Resolve + Clone + Send + Sync, C: Connector<R>> HttpsOnlyConnector<C, R> {
+    ///Creates new instance with specified connector.
+    pub fn new(resolver: R) -> Self {
+        let http = C::with(resolver);
+
+        let mut config = rustls::ClientConfig::new();
+        config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+
+        Self {
+            http,
+            config: Arc::new(config),
+            _resolver: PhantomData,
+        }
+    }
+}
+
+impl<R, C> fmt::Debug for HttpsOnlyConnector<C, R> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("HttpsConnector")
+    }
+}
+
+impl<R: Resolve + Clone + Send + Sync, C: Connector<R>> Connect for HttpsOnlyConnector<C, R> where R::Future: Send {
+    type Transport = TlsStream<<C as Connect>::Transport>;
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+    type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
+
+    fn connect(&self, dst: connect::Destination) -> Self::Future {
+        use rustls::Session;
+        use webpki::{DNSName, DNSNameRef};
+
+        let cfg = self.config.clone();
+        let connector = tokio_rustls::TlsConnector::from(cfg);
+
+        let hostname = dst.host().to_string();
+        self.http.connect(dst).err_into().and_then(move |(tcp, conn)| match DNSNameRef::try_from_ascii_str(&hostname) {
+            Ok(dns_name) => futures_util::future::ready(Ok((tcp, conn, DNSName::from(dns_name)))),
+            Err(_) => futures_util::future::ready(Err("invalid DNS name".into())),
+        }).and_then(move |(tcp, conn, dns_name)| connector.connect(dns_name.as_ref(), tcp).and_then(|tls| match tls.get_ref().1.get_alpn_protocol() {
+            Some(b"h2") => futures_util::future::ready(Ok((tls, conn.negotiated_h2()))),
+            _ => futures_util::future::ready(Ok((tls, conn))),
+
+        }).err_into())
+    }
+}
+
+impl<R: Resolve + Clone + Send + Sync, T: Connector<R>> Connector<R> for HttpsOnlyConnector<T, R> where R::Future: Send {
     fn with(resolver: R) -> Self {
         let http = T::with(resolver);
 
