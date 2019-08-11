@@ -51,7 +51,7 @@ data-encoding = { version = "2", optional = true }
 getrandom = { version = "0", optional = true }
 
 derive_more = "0.15"
-async-timer = "0.2"
+async-timer = { version = "0.3", features = ["tokio_on"] }
 
 futures-util-preview = "0.3.0-alpha"
 
