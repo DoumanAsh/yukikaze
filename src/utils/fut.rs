@@ -12,8 +12,6 @@ pub enum Either<A, B> {
     Right(B),
 }
 
-unsafe impl<A: Sync, B: Sync> Sync for Either<A, B> {}
-unsafe impl<A: Send, B: Send> Send for Either<A, B> {}
 impl<A: Unpin, B: Unpin> Unpin for Either<A, B> {}
 
 impl<A: Unpin, B: Unpin> Future for Either<A, B> where A: Future, B: Future<Output = A::Output> {
@@ -27,7 +25,7 @@ impl<A: Unpin, B: Unpin> Future for Either<A, B> where A: Future, B: Future<Outp
     }
 }
 
-///Create pair of future that being processed together.
+///Create pair of futures that being processed together.
 ///
 ///First goes left, then  right.
 pub struct Pair<A: Unpin, B: Unpin> {
