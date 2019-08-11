@@ -74,12 +74,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeHttpsStream<T> {
 ///HTTPs connect based on Rustls.
 pub struct HttpsConnector {
     http: HttpConnector,
-    config: Arc<rustls::ClientConfig>,
+    config: Arc<tokio_rustls::rustls::ClientConfig>,
 }
 
 impl Connector for HttpsConnector {
     fn new() -> Self {
-        let mut config = rustls::ClientConfig::new();
+        let mut config = tokio_rustls::rustls::ClientConfig::new();
         config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
         Self {
@@ -101,8 +101,8 @@ impl Connect for HttpsConnector {
     type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
-        use rustls::Session;
-        use webpki::{DNSName, DNSNameRef};
+        use tokio_rustls::rustls::Session;
+        use tokio_rustls::webpki::{DNSName, DNSNameRef};
 
         let is_https = dst.scheme() == "https";
 
@@ -137,13 +137,13 @@ impl Connect for HttpsConnector {
 ///Any attempt to connect over plain HTTP will result in corrupt message error.
 pub struct HttpsOnlyConnector {
     http: HttpConnector,
-    config: Arc<rustls::ClientConfig>,
+    config: Arc<tokio_rustls::rustls::ClientConfig>,
 }
 
 impl Connector for HttpsOnlyConnector {
     ///Creates new instance with specified connector.
     fn new() -> Self {
-        let mut config = rustls::ClientConfig::new();
+        let mut config = tokio_rustls::rustls::ClientConfig::new();
         config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
         Self {
@@ -165,8 +165,8 @@ impl Connect for HttpsOnlyConnector {
     type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
-        use rustls::Session;
-        use webpki::{DNSName, DNSNameRef};
+        use tokio_rustls::rustls::Session;
+        use tokio_rustls::webpki::{DNSName, DNSNameRef};
 
         let cfg = self.config.clone();
         let connector = tokio_rustls::TlsConnector::from(cfg);

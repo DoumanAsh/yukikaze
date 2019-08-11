@@ -44,11 +44,13 @@ pub mod rt;
 #[cfg(feature = "client")]
 pub mod connector;
 
+pub extern crate mime;
 pub extern crate lazy_static;
 pub extern crate bytes;
 pub extern crate http;
 pub extern crate percent_encoding;
 pub extern crate async_timer;
+pub extern crate futures_util;
 #[cfg(feature = "encoding")]
 pub extern crate encoding_rs;
 #[cfg(feature = "compu")]

@@ -101,14 +101,11 @@ macro_rules! declare_global_client {
         }
 
         use $crate::client::RequestResult;
-        use core::future::Future;
-        use async_timer::timed::Expired;
-        use async_timer::Oneshot;
 
         impl Request {
             #[inline(always)]
             ///Sends request, and returns future that resolves to response
-            pub fn request(self) -> impl Future<Output=RequestResult> {
+            pub fn request(self) -> impl core::future::Future<Output=RequestResult> {
                 GLOBAL_CLIENT.request(self.0)
             }
 
@@ -120,7 +117,7 @@ macro_rules! declare_global_client {
             ///
             ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
             ///variant.
-            pub fn send(self) -> impl Future<Output=Result<RequestResult, Expired<impl Future<Output=RequestResult>, impl Oneshot>>> {
+            pub fn send(self) -> impl core::future::Future<Output=Result<RequestResult, $crate::async_timer::timed::Expired<impl core::future::Future<Output=RequestResult>, impl $crate::async_timer::Oneshot>>> {
                 GLOBAL_CLIENT.send(self.0)
             }
 
@@ -132,13 +129,13 @@ macro_rules! declare_global_client {
             ///
             ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
             ///variant.
-            pub fn send_redirect(self) -> impl Future<Output=Result<RequestResult, Expired<impl Future<Output=RequestResult> + 'static, impl Oneshot>>> {
+            pub fn send_redirect(self) -> impl core::future::Future<Output=Result<RequestResult, $crate::async_timer::timed::Expired<impl core::future::Future<Output=RequestResult> + 'static, impl $crate::async_timer::Oneshot>>> {
                 GLOBAL_CLIENT.send_redirect(self.0)
             }
 
             #[inline(always)]
             ///Sends request and returns response, while handling redirects.
-            pub fn redirect_request(self) -> impl Future<Output=RequestResult> {
+            pub fn redirect_request(self) -> impl core::future::Future<Output=RequestResult> {
                 GLOBAL_CLIENT.redirect_request(self.0)
             }
         }

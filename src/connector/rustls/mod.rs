@@ -1,7 +1,7 @@
 //!Rustls TLS implementation
 
-pub use rustls::*;
-pub use webpki;
+pub use::tokio_rustls::rustls::*;
+pub use tokio_rustls::webpki;
 pub use webpki_roots;
 
 pub mod connector;

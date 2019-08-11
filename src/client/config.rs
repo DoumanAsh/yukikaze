@@ -100,8 +100,9 @@ pub trait Config {
 ///
 ///Connector:
 ///
-///- When `rustls` enabled uses `hyper_rustls::HttpsConnector`
-///- Otherwise uses `hyper::client::HttpConnector`
+///- When `rustls` enabled uses `yukikaze::connector::rustls::HttpsConnector` as default
+///
+///- Otherwise uses `yukikaze::connector::HttpConnector`
 pub struct DefaultCfg;
 
 impl Config for DefaultCfg {
