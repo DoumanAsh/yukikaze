@@ -43,11 +43,6 @@
 //!    type Connector = client::config::DefaultConnector;
 //!    type Timer = client::config::DefaultTimer;
 //!
-//!    fn new_connector() -> Self::Connector {
-//!        use yukikaze::tls::Connector;
-//!        Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
-//!    }
-//!
 //!    fn timeout() -> time::Duration {
 //!        //never times out
 //!        time::Duration::from_secs(0)
@@ -110,7 +105,8 @@ impl<C: config::Config> Client<C> {
     ///
     ///Use `Default` if you'd like to use [default](config/struct.DefaultCfg.html) config.
     pub fn new() -> Client<C> {
-        let inner = C::config_hyper(&mut hyper::Client::builder()).build(C::new_connector());
+        use crate::connector::Connector;
+        let inner = C::config_hyper(&mut hyper::Client::builder()).executor(config::DefaultExecutor).build(C::Connector::new());
 
         Self {
             inner,

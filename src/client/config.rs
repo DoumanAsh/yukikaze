@@ -5,29 +5,26 @@ use core::time;
 
 use crate::utils;
 use crate::header;
-use crate::tls::Connector;
+use crate::connector::Connector;
 
 ///Default timer, which is used by [DefaultCfg](struct.DefaultCfg.html)
 pub type DefaultTimer = async_timer::oneshot::Timer;
 #[cfg(feature = "rustls-on")]
 ///Default connector, which is used by [DefaultCfg](struct.DefaultCfg.html)
-pub type DefaultConnector = crate::tls::rustls::HttpsConnector<hyper::client::HttpConnector, hyper::client::connect::dns::GaiResolver>;
+pub type DefaultConnector = crate::connector::rustls::HttpsConnector;
 #[cfg(not(feature = "rustls-on"))]
 ///Default connector, which is used by [DefaultCfg](struct.DefaultCfg.html)
-pub type DefaultConnector = hyper::client::HttpConnector;
+pub type DefaultConnector = crate::connector::HttpConnector;
 
 ///Generic config trait.
 ///
 ///Each method describes single aspect of configuration
 ///and provided with sane defaults
-pub trait Config<R=hyper::client::connect::dns::GaiResolver> where R: hyper::client::connect::dns::Resolve + Clone + Send + Sync {
+pub trait Config {
     ///Connector type.
-    type Connector: Connector<R>;
+    type Connector: Connector;
     ///Timer type.
     type Timer: async_timer::oneshot::Oneshot;
-
-    ///Creates new connector and returns its instance.
-    fn new_connector() -> Self::Connector;
 
     #[inline]
     ///Specifies whether to automatically request compressed response.
@@ -110,12 +107,34 @@ pub struct DefaultCfg;
 impl Config for DefaultCfg {
     type Connector = DefaultConnector;
     type Timer = DefaultTimer;
+}
+
+pub(crate) struct DefaultExecutor;
+
+use tokio_executor::Executor;
+
+impl Executor for DefaultExecutor {
+    #[inline]
+    fn spawn(&mut self, future: core::pin::Pin<Box<dyn core::future::Future<Output = ()> + Send>>) -> Result<(), tokio_executor::SpawnError> {
+        let mut exec = tokio_executor::DefaultExecutor::current();
+        exec.spawn(future)
+    }
 
     #[inline]
-    ///Creates new connector and returns its instance.
-    ///
-    ///Uses 4 threads by default.
-    fn new_connector() -> Self::Connector {
-        Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
+    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
+        let exec = tokio_executor::DefaultExecutor::current();
+        exec.status()
+    }
+}
+
+impl Executor for &DefaultExecutor {
+    fn spawn(&mut self, future: core::pin::Pin<Box<dyn core::future::Future<Output = ()> + Send>>) -> Result<(), tokio_executor::SpawnError> {
+        let mut exec = tokio_executor::DefaultExecutor::current();
+        exec.spawn(future)
+    }
+
+    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
+        let exec = tokio_executor::DefaultExecutor::current();
+        exec.status()
     }
 }

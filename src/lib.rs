@@ -42,7 +42,7 @@ pub mod client;
 #[macro_use]
 pub mod rt;
 #[cfg(feature = "client")]
-pub mod tls;
+pub mod connector;
 
 pub extern crate lazy_static;
 pub extern crate bytes;

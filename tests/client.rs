@@ -13,11 +13,6 @@ impl client::config::Config for TimeoutCfg {
     type Connector = client::config::DefaultConnector;
     type Timer = client::config::DefaultTimer;
 
-    fn new_connector() -> Self::Connector {
-        use yukikaze::tls::Connector;
-        Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
-    }
-
     fn timeout() -> time::Duration {
         time::Duration::from_millis(30)
     }
@@ -39,11 +34,6 @@ async fn should_handle_redirect() {
     impl client::config::Config for SmolRedirect {
         type Connector = client::config::DefaultConnector;
         type Timer = client::config::DefaultTimer;
-
-        fn new_connector() -> Self::Connector {
-            use yukikaze::tls::Connector;
-            Self::Connector::with(hyper::client::connect::dns::GaiResolver::new(4))
-        }
 
         fn max_redirect_num() -> usize {
             3
