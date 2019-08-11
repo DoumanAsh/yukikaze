@@ -63,6 +63,7 @@ impl hyper::client::connect::Connect for HttpConnector {
     type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
+        //TODO: Check if Unpin is not available due to internal machinery of generated future or not
         DummyPin(connect_tcp(dst))
     }
 }
