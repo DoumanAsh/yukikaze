@@ -58,7 +58,6 @@
 //!}
 //!```
 
-use hyper::client::connect::Connect;
 use futures_util::FutureExt;
 
 use core::marker::PhantomData;
@@ -76,10 +75,7 @@ pub use request::Request;
 pub use response::Response;
 
 ///HTTP Client
-pub struct Client<C=config::DefaultCfg> where C: config::Config, C: 'static,
-//TODO: This shit should be removed once trait bounds for associated types will allow where clauses
-<C::Connector as Connect>::Future: 'static, <C::Connector as Connect>::Transport: 'static
-{
+pub struct Client<C=config::DefaultCfg> where C: config::Config + 'static {
     inner: hyper::Client<C::Connector>,
     _config: PhantomData<C>
 }
