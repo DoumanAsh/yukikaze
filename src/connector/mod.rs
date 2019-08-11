@@ -4,7 +4,7 @@
 pub mod rustls;
 
 use std::io;
-use core::fmt;
+use core::{pin, task, fmt};
 use core::future::Future;
 
 use hyper::client::connect::{self, Connected};
@@ -39,6 +39,19 @@ async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_tcp::TcpStr
     return Err(io::Error::new(io::ErrorKind::NotFound, "Unable to connect"));
 }
 
+struct DummyPin<T>(T);
+
+impl<T> Unpin for DummyPin<T> {}
+
+impl<T: Future<Output = io::Result<(tokio_tcp::TcpStream, Connected)>>> Future for DummyPin<T> {
+    type Output = io::Result<(tokio_tcp::TcpStream, Connected)>;
+
+    fn poll(mut self: pin::Pin<&mut Self>, ctx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let mut fut = self.as_mut();
+        Future::poll(unsafe { pin::Pin::new_unchecked(&mut fut.0) }, ctx)
+    }
+}
+
 #[derive(Clone)]
 ///Plain HTTP Connector
 pub struct HttpConnector {
@@ -50,7 +63,7 @@ impl hyper::client::connect::Connect for HttpConnector {
     type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
-        Box::pin(connect_tcp(dst))
+        DummyPin(connect_tcp(dst))
     }
 }
 
