@@ -171,11 +171,11 @@ impl<C: config::Config> Client<C> {
                 let job = async_timer::Timed::<_, C::Timer>::new(ongoing, timeout);
                 #[cfg(not(feature = "carry_extensions"))]
                 {
-                    matsu!(job.wait())
+                    matsu!(job)
                 }
                 #[cfg(feature = "carry_extensions")]
                 {
-                    matsu!(job.wait()).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
+                    matsu!(job).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
                 }
             }
         }
@@ -200,7 +200,7 @@ impl<C: config::Config> Client<C> {
                 //around so it is a bit unsafe in some edgy cases.
                 let ongoing = self.redirect_request(req);
                 let job = unsafe { async_timer::Timed::<_, C::Timer>::new_unchecked(ongoing, timeout) };
-                matsu!(job.wait())
+                matsu!(job)
             }
         }
     }
