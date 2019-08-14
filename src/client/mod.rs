@@ -148,12 +148,12 @@ impl<C: config::Config> Client<C> {
 
     ///Sends request and returns response. Timed version.
     ///
-    ///On timeout error it returns `async_timer::timed::Expired` as `Error`
+    ///On timeout error it returns `async_timer::Expired` as `Error`
     ///`Expired` implements `Future` that can be used to re-spawn ongoing request again.
     ///
     ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
     ///variant.
-    pub async fn send(&self, mut req: request::Request) -> Result<RequestResult, async_timer::timed::Expired<impl Future<Output=RequestResult>, C::Timer>> {
+    pub async fn send(&self, mut req: request::Request) -> Result<RequestResult, async_timer::Expired<impl Future<Output=RequestResult>, C::Timer>> {
         Self::apply_headers(&mut req);
 
         #[cfg(feature = "carry_extensions")]
@@ -171,11 +171,11 @@ impl<C: config::Config> Client<C> {
                 let job = async_timer::Timed::<_, C::Timer>::new(ongoing, timeout);
                 #[cfg(not(feature = "carry_extensions"))]
                 {
-                    matsu!(job)
+                    matsu!(job.wait())
                 }
                 #[cfg(feature = "carry_extensions")]
                 {
-                    matsu!(job).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
+                    matsu!(job.wait()).map(move |res| res.map(move |resp| resp.replace_extensions(&mut extensions)))
                 }
             }
         }
@@ -183,12 +183,12 @@ impl<C: config::Config> Client<C> {
 
     ///Sends request and returns response, while handling redirects. Timed version.
     ///
-    ///On timeout error it returns `async_timer::timed::Expired` as `Error`
+    ///On timeout error it returns `async_timer::Expired` as `Error`
     ///`Expired` implements `Future` that can be used to re-spawn ongoing request again.
     ///
     ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
     ///variant.
-    pub async fn send_redirect(&'static self, req: request::Request) -> Result<RequestResult, async_timer::timed::Expired<impl Future<Output=RequestResult> + 'static, C::Timer>> {
+    pub async fn send_redirect(&'static self, req: request::Request) -> Result<RequestResult, async_timer::Expired<impl Future<Output=RequestResult> + 'static, C::Timer>> {
         let timeout = C::timeout();
         match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
             true => Ok(matsu!(self.redirect_request(req))),
@@ -200,7 +200,7 @@ impl<C: config::Config> Client<C> {
                 //around so it is a bit unsafe in some edgy cases.
                 let ongoing = self.redirect_request(req);
                 let job = unsafe { async_timer::Timed::<_, C::Timer>::new_unchecked(ongoing, timeout) };
-                matsu!(job)
+                matsu!(job.wait())
             }
         }
     }

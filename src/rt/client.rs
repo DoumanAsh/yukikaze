@@ -112,24 +112,24 @@ macro_rules! declare_global_client {
             #[inline(always)]
             ///Sends request and returns response. Timed version.
             ///
-            ///On timeout error it returns `async_timer::timed::Expired` as `Error`
+            ///On timeout error it returns `async_timer::Expired` as `Error`
             ///`Expired` implements `Future` that can be used to re-spawn ongoing request again.
             ///
             ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
             ///variant.
-            pub fn send(self) -> impl core::future::Future<Output=Result<RequestResult, $crate::async_timer::timed::Expired<impl core::future::Future<Output=RequestResult>, impl $crate::async_timer::Oneshot>>> {
+            pub fn send(self) -> impl core::future::Future<Output=Result<RequestResult, $crate::async_timer::Expired<impl core::future::Future<Output=RequestResult>, impl $crate::async_timer::Oneshot>>> {
                 GLOBAL_CLIENT.send(self.0)
             }
 
             #[inline(always)]
             ///Sends request and returns response, while handling redirects. Timed version.
             ///
-            ///On timeout error it returns `async_timer::timed::Expired` as `Error`
+            ///On timeout error it returns `async_timer::Expired` as `Error`
             ///`Expired` implements `Future` that can be used to re-spawn ongoing request again.
             ///
             ///If request resolves in time returns `Result<response::Response, hyper::Error>` as `Ok`
             ///variant.
-            pub fn send_redirect(self) -> impl core::future::Future<Output=Result<RequestResult, $crate::async_timer::timed::Expired<impl core::future::Future<Output=RequestResult> + 'static, impl $crate::async_timer::Oneshot>>> {
+            pub fn send_redirect(self) -> impl core::future::Future<Output=Result<RequestResult, $crate::async_timer::Expired<impl core::future::Future<Output=RequestResult> + 'static, impl $crate::async_timer::Oneshot>>> {
                 GLOBAL_CLIENT.send_redirect(self.0)
             }
 
