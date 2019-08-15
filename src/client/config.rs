@@ -44,6 +44,15 @@ pub trait Config {
         time::Duration::from_secs(30)
     }
 
+    ///Specifies how to set user agent
+    ///
+    ///By default it set's `Yukikaze/<lib version>`, if agent is not present
+    fn default_user_agent(request: &mut super::request::Request) {
+        if !request.headers().contains_key(header::USER_AGENT) {
+            request.headers_mut().insert(header::USER_AGENT, header::HeaderValue::from_static(concat!("Yukikaze/", env!("CARGO_PKG_VERSION"))));
+        }
+    }
+
     #[inline]
     ///Allows to sets default headers before request
     ///is sent out
@@ -53,12 +62,10 @@ pub trait Config {
     ///
     ///By default it sets following, if not present:
     ///
-    ///- Yukikaze-sama's user-agent
-    ///- `HOST` header with host, and optionally port, taken from URI.
+    ///- Set default user agent;
+    ///- `HOST` header with host, and optionally port, taken from URI;
     fn default_headers(request: &mut super::request::Request) {
-        if !request.headers().contains_key(header::USER_AGENT) {
-            request.headers_mut().insert(header::USER_AGENT, header::HeaderValue::from_static(concat!("Yukikaze/", env!("CARGO_PKG_VERSION"))));
-        }
+        Self::default_user_agent(request);
 
         if !request.headers().contains_key(header::HOST) {
             let host = request.uri().host().and_then(|host| match request.uri().port_part().map(|port| port.as_u16()) {
