@@ -15,7 +15,7 @@ pub trait Connector: hyper::client::connect::Connect {
     fn new() -> Self;
 }
 
-async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_tcp::TcpStream, Connected)> {
+async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_net::tcp::TcpStream, Connected)> {
     use std::net::ToSocketAddrs;
 
     let host = dst.host();
@@ -30,7 +30,7 @@ async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_tcp::TcpStr
     let addrs = (host, port).to_socket_addrs()?;
 
     for addr in addrs {
-        match matsu!(tokio_tcp::TcpStream::connect(&addr)) {
+        match matsu!(tokio_net::tcp::TcpStream::connect(&addr)) {
             Ok(io) => return Ok((io, Connected::new())),
             Err(_) => continue,
         }
@@ -43,8 +43,8 @@ struct DummyPin<T>(T);
 
 impl<T> Unpin for DummyPin<T> {}
 
-impl<T: Future<Output = io::Result<(tokio_tcp::TcpStream, Connected)>>> Future for DummyPin<T> {
-    type Output = io::Result<(tokio_tcp::TcpStream, Connected)>;
+impl<T: Future<Output = io::Result<(tokio_net::tcp::TcpStream, Connected)>>> Future for DummyPin<T> {
+    type Output = io::Result<(tokio_net::tcp::TcpStream, Connected)>;
 
     fn poll(mut self: pin::Pin<&mut Self>, ctx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let mut fut = self.as_mut();
@@ -58,7 +58,7 @@ pub struct HttpConnector {
 }
 
 impl hyper::client::connect::Connect for HttpConnector {
-    type Transport = tokio_tcp::TcpStream;
+    type Transport = tokio_net::tcp::TcpStream;
     type Error = io::Error;
     type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
 
