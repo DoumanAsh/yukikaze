@@ -29,7 +29,6 @@
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
-#![feature(async_await)]
 #![cfg_attr(feature = "client", feature(type_alias_impl_trait))]
 
 #[macro_use]
