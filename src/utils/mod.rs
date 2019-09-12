@@ -38,6 +38,21 @@ macro_rules! unreach {
 pub mod fut;
 pub mod enc;
 
+///Option extensions
+pub trait OptionExt<T> {
+    ///Unwraps, assuming `None` is impossible
+    fn unreach_none(self) -> T;
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    fn unreach_none(self) -> T {
+        match self {
+            Some(val) => val,
+            None => unreach!(),
+        }
+    }
+}
+
 ///Convenience wrapper over `bytes::BytesMut`
 ///
 ///Provides `io::Write` that automatically resizes.

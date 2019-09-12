@@ -58,8 +58,6 @@
 //!}
 //!```
 
-use futures_util::FutureExt;
-
 use core::marker::PhantomData;
 use core::future::Future;
 use core::fmt;
@@ -159,7 +157,11 @@ impl<C: config::Config> Client<C> {
         #[cfg(feature = "carry_extensions")]
         let mut extensions = req.extract_extensions();
 
-        let ongoing = self.inner.request(req.into()).map(|res| res.map(|resp| response::Response::new(resp)));
+        let ongoing = self.inner.request(req.into());
+        let ongoing = async {
+            let res = matsu!(ongoing);
+            res.map(|resp| response::Response::new(resp))
+        };
 
         let timeout = C::timeout();
         match timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
@@ -168,7 +170,7 @@ impl<C: config::Config> Client<C> {
             #[cfg(feature = "carry_extensions")]
             true => Ok(matsu!(ongoing).map(move |resp| resp.replace_extensions(&mut extensions))),
             false => {
-                let job = async_timer::Timed::<_, C::Timer>::new(ongoing, timeout);
+                let job = unsafe { async_timer::Timed::<_, C::Timer>::new_unchecked(ongoing, timeout) };
                 #[cfg(not(feature = "carry_extensions"))]
                 {
                     matsu!(job)

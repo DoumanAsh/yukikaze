@@ -3,9 +3,9 @@
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_rustls::client::TlsStream;
 use hyper::client::connect::{self, Connected, Connect};
-use futures_util::{TryFutureExt, FutureExt};
 
 use super::super::{HttpConnector, Connector};
+use crate::utils::{self, OptionExt};
 
 use std::io;
 use std::sync::Arc;
@@ -98,34 +98,25 @@ impl fmt::Debug for HttpsConnector {
 impl Connect for HttpsConnector {
     type Transport = MaybeHttpsStream<<HttpConnector as Connect>::Transport>;
     type Error = Box<dyn std::error::Error + Send + Sync>;
-    type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
+    type Future = utils::fut::Either<MaybeHttpsConnecting<<HttpConnector as Connect>::Future>, MaybeHttpConnecting<<HttpConnector as Connect>::Future>>;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
-        use tokio_rustls::rustls::Session;
-        use tokio_rustls::webpki::{DNSName, DNSNameRef};
-
         let is_https = dst.scheme() == "https";
 
         match is_https {
             true => {
-                let cfg = self.config.clone();
-                let connector = tokio_rustls::TlsConnector::from(cfg);
+                let state = HttpsOnlyConnectingState::Conneting(self.http.connect(dst.clone()));
 
-                let hostname = dst.host().to_string();
-                let fut = self.http.connect(dst).err_into().and_then(move |(tcp, conn)| match DNSNameRef::try_from_ascii_str(&hostname) {
-                    Ok(dns_name) => futures_util::future::ready(Ok((tcp, conn, DNSName::from(dns_name)))),
-                    Err(_) => futures_util::future::ready(Err("invalid DNS name".into())),
-                }).and_then(move |(tcp, conn, dns_name)| connector.connect(dns_name.as_ref(), tcp).and_then(|tls| match tls.get_ref().1.get_alpn_protocol() {
-                    Some(b"h2") => futures_util::future::ready(Ok((MaybeHttpsStream::Https(tls), conn.negotiated_h2()))),
-                    _ => futures_util::future::ready(Ok((MaybeHttpsStream::Https(tls), conn))),
+                let fut = HttpsOnlyConnecting {
+                    dst,
+                    config: self.config.clone(),
+                    state,
+                };
 
-                }).err_into());
-
-                crate::utils::fut::Either::Left(fut)
+                utils::fut::Either::Left(MaybeHttpsConnecting(fut))
             },
             false => {
-                let fut = self.http.connect(dst).map(|res| res.map(|(tcp, conn)| (MaybeHttpsStream::Http(tcp), conn)).map_err(Into::into));
-                crate::utils::fut::Either::Right(fut)
+                utils::fut::Either::Right(MaybeHttpConnecting(self.http.connect(dst)))
             }
         }
     }
@@ -162,23 +153,85 @@ impl fmt::Debug for HttpsOnlyConnector {
 impl Connect for HttpsOnlyConnector {
     type Transport = TlsStream<<HttpConnector as Connect>::Transport>;
     type Error = Box<dyn std::error::Error + Send + Sync>;
-    type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
+    type Future = HttpsOnlyConnecting<<HttpConnector as Connect>::Future>;
 
     fn connect(&self, dst: connect::Destination) -> Self::Future {
+        let state = HttpsOnlyConnectingState::Conneting(self.http.connect(dst.clone()));
+
+        HttpsOnlyConnecting {
+            dst,
+            config: self.config.clone(),
+            state,
+        }
+    }
+}
+
+enum HttpsOnlyConnectingState<T> {
+    Conneting(T),
+    Tls(tokio_rustls::Connect<tokio_net::tcp::TcpStream>, Option<Connected>),
+}
+
+///Ongoing HTTPS only connect
+pub struct HttpsOnlyConnecting<T> {
+    dst: connect::Destination,
+    config: Arc<tokio_rustls::rustls::ClientConfig>,
+    state: HttpsOnlyConnectingState<T>,
+}
+
+impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transport, Connected)>>> Future for HttpsOnlyConnecting<F> {
+    type Output = Result<(TlsStream<<HttpConnector as Connect>::Transport>, Connected), Box<dyn std::error::Error + Send + Sync>>;
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         use tokio_rustls::rustls::Session;
-        use tokio_rustls::webpki::{DNSName, DNSNameRef};
+        use tokio_rustls::webpki::{DNSNameRef};
 
-        let cfg = self.config.clone();
-        let connector = tokio_rustls::TlsConnector::from(cfg);
+        loop {
+            self.state = match self.state {
+                HttpsOnlyConnectingState::Conneting(ref mut connecting) => match Future::poll(unsafe { Pin::new_unchecked(connecting) }, ctx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error.into())),
+                    Poll::Ready(Ok((tcp, conn))) => match DNSNameRef::try_from_ascii_str(self.dst.host()) {
+                        Ok(dns_name) => {
+                            let cfg = self.config.clone();
+                            let connector = tokio_rustls::TlsConnector::from(cfg);
+                            HttpsOnlyConnectingState::Tls(connector.connect(dns_name, tcp), Some(conn))
+                        },
+                        Err(_) => return Poll::Ready(Err("invalid DNS name".into())),
+                    }
+                },
+                HttpsOnlyConnectingState::Tls(ref mut connecting, ref mut conn) => match Future::poll(unsafe { Pin::new_unchecked(connecting) }, ctx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error.into())),
+                    Poll::Ready(Ok(tls)) => match tls.get_ref().1.get_alpn_protocol() {
+                        Some(b"h2") => return Poll::Ready(Ok((tls, conn.take().unreach_none().negotiated_h2()))),
+                        _ => return Poll::Ready(Ok((tls, conn.take().unreach_none()))),
+                    }
+                }
+            }
+        }
+    }
+}
 
-        let hostname = dst.host().to_string();
-        self.http.connect(dst).err_into().and_then(move |(tcp, conn)| match DNSNameRef::try_from_ascii_str(&hostname) {
-            Ok(dns_name) => futures_util::future::ready(Ok((tcp, conn, DNSName::from(dns_name)))),
-            Err(_) => futures_util::future::ready(Err("invalid DNS name".into())),
-        }).and_then(move |(tcp, conn, dns_name)| connector.connect(dns_name.as_ref(), tcp).and_then(|tls| match tls.get_ref().1.get_alpn_protocol() {
-            Some(b"h2") => futures_util::future::ready(Ok((tls, conn.negotiated_h2()))),
-            _ => futures_util::future::ready(Ok((tls, conn))),
+///Ongoing HTTPS connect
+pub struct MaybeHttpsConnecting<T>(HttpsOnlyConnecting<T>);
 
-        }).err_into())
+impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transport, Connected)>>> Future for MaybeHttpsConnecting<F> {
+    type Output = Result<(MaybeHttpsStream<<HttpConnector as Connect>::Transport>, Connected), Box<dyn std::error::Error + Send + Sync>>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner = unsafe { self.map_unchecked_mut(|this| &mut this.0) };
+        Future::poll(inner, ctx).map(|res| res.map(|(tls, conn)| (MaybeHttpsStream::Https(tls), conn)))
+    }
+}
+
+///Ongoing HTTP connect
+pub struct MaybeHttpConnecting<T>(T);
+
+impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transport, Connected)>>> Future for MaybeHttpConnecting<F> {
+    type Output = Result<(MaybeHttpsStream<<HttpConnector as Connect>::Transport>, Connected), Box<dyn std::error::Error + Send + Sync>>;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let inner = unsafe { self.map_unchecked_mut(|this| &mut this.0) };
+        Future::poll(inner, ctx).map(|res| res.map(|(tcp, conn)| (MaybeHttpsStream::Http(tcp), conn))).map_err(|error| error.into())
     }
 }
