@@ -1,5 +1,3 @@
-#![feature(async_await)]
-
 use yukikaze::{matsu, client};
 
 use core::time;

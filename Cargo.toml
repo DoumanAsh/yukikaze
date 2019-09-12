@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.0-alpha.4"
+version = "1.0.0-alpha.5"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -16,7 +16,7 @@ categories = ["web-programming::http-client"]
 edition = "2018"
 
 [dependencies.hyper]
-git = "https://github.com/hyperium/hyper.git"
+version = "0.13.0-alpha"
 optional = true
 default-features = false
 

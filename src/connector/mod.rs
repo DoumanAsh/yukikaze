@@ -4,7 +4,7 @@
 pub mod rustls;
 
 use std::io;
-use core::{pin, task, fmt};
+use core::{pin, fmt};
 use core::future::Future;
 
 use hyper::client::connect::{self, Connected};
@@ -39,19 +39,6 @@ async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_net::tcp::T
     return Err(io::Error::new(io::ErrorKind::NotFound, "Unable to connect"));
 }
 
-struct DummyPin<T>(T);
-
-impl<T> Unpin for DummyPin<T> {}
-
-impl<T: Future<Output = io::Result<(tokio_net::tcp::TcpStream, Connected)>>> Future for DummyPin<T> {
-    type Output = io::Result<(tokio_net::tcp::TcpStream, Connected)>;
-
-    fn poll(mut self: pin::Pin<&mut Self>, ctx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let mut fut = self.as_mut();
-        Future::poll(unsafe { pin::Pin::new_unchecked(&mut fut.0) }, ctx)
-    }
-}
-
 #[derive(Clone)]
 ///Plain HTTP Connector
 pub struct HttpConnector {
@@ -60,11 +47,13 @@ pub struct HttpConnector {
 impl hyper::client::connect::Connect for HttpConnector {
     type Transport = tokio_net::tcp::TcpStream;
     type Error = io::Error;
-    type Future = impl Future<Output = Result<(Self::Transport, Connected), Self::Error>> + Unpin + Send;
+    type Future = pin::Pin<Box<dyn Future<Output = io::Result<(tokio_net::tcp::TcpStream, Connected)>> + Send>>;
 
+    #[inline(always)]
     fn connect(&self, dst: connect::Destination) -> Self::Future {
-        //TODO: Check if Unpin is not available due to internal machinery of generated future or not
-        DummyPin(connect_tcp(dst))
+        //TODO: remove uncessary allocations
+        //      Most likely need to work-around Unpin requirement
+        Box::pin(connect_tcp(dst))
     }
 }
 
