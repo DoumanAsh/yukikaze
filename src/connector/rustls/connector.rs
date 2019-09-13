@@ -73,7 +73,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> AsyncWrite for MaybeHttpsStream<T> {
 #[derive(Clone)]
 ///HTTPs connect based on Rustls.
 pub struct HttpsConnector {
-    http: HttpConnector,
+    pub http: HttpConnector,
     config: Arc<tokio_rustls::rustls::ClientConfig>,
 }
 
@@ -127,7 +127,7 @@ impl Connect for HttpsConnector {
 ///
 ///Any attempt to connect over plain HTTP will result in corrupt message error.
 pub struct HttpsOnlyConnector {
-    http: HttpConnector,
+    pub http: HttpConnector,
     config: Arc<tokio_rustls::rustls::ClientConfig>,
 }
 
