@@ -16,8 +16,6 @@ pub trait Connector: hyper::client::connect::Connect {
 }
 
 async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_net::tcp::TcpStream, Connected)> {
-    use std::net::ToSocketAddrs;
-
     let host = dst.host();
     let port = match dst.port() {
         Some(port) => port,
@@ -27,16 +25,10 @@ async fn connect_tcp(dst: connect::Destination) -> io::Result<(tokio_net::tcp::T
         }
     };
 
-    let addrs = (host, port).to_socket_addrs()?;
-
-    for addr in addrs {
-        match matsu!(tokio_net::tcp::TcpStream::connect(&addr)) {
-            Ok(io) => return Ok((io, Connected::new())),
-            Err(_) => continue,
-        }
+    match matsu!(tokio_net::tcp::TcpStream::connect((host, port))) {
+        Ok(io) => return Ok((io, Connected::new())),
+        Err(_) => Err(io::Error::new(io::ErrorKind::NotFound, "Unable to connect")),
     }
-
-    return Err(io::Error::new(io::ErrorKind::NotFound, "Unable to connect"));
 }
 
 #[derive(Clone)]
