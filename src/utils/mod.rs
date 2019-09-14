@@ -37,6 +37,7 @@ macro_rules! unreach {
 
 pub mod fut;
 pub mod enc;
+pub(crate) mod http;
 
 ///Option extensions
 pub trait OptionExt<T> {
@@ -131,8 +132,8 @@ impl io::Write for BytesWriter {
 }
 
 ///Converts integer to header's value.
-pub fn content_len_value(len: u64) -> http::header::HeaderValue {
+pub fn content_len_value(len: u64) -> crate::http::header::HeaderValue {
     let mut res = BytesWriter::with_capacity(1);
     let _ = write!(&mut res, "{}", len);
-    unsafe { http::header::HeaderValue::from_shared_unchecked(res.freeze()) }
+    unsafe { crate::http::header::HeaderValue::from_shared_unchecked(res.freeze()) }
 }

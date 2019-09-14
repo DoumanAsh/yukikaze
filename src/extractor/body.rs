@@ -5,8 +5,8 @@ use std::fs::File;
 
 use super::BodyReadError;
 use crate::header::ContentEncoding;
+use crate::utils::http::Body as HttpBody;
 
-use futures_util::stream::StreamExt;
 #[cfg(feature = "encoding")]
 use encoding_rs::Encoding;
 #[cfg(feature = "compu")]
@@ -131,7 +131,7 @@ macro_rules! impl_compu_file {
 ///- `encoding` - Specifies encoding to use.
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<bytes::Bytes, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>,
 {
     let (limit, buffer_size) = calculate_buffer_size(limit);
 
@@ -175,7 +175,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
 ///- `encoding` - Specifies content's encoding to use.
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>,
 {
     let bytes = matsu!(raw_bytes(body, encoding, limit))?;
 
@@ -192,7 +192,7 @@ pub async fn text<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usi
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 ///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>,
 {
     let bytes = matsu!(raw_bytes(body, encoding, limit))?;
 
@@ -210,7 +210,7 @@ pub async fn text_charset<S, I, E>(body: S, encoding: ContentEncoding, limit: Op
 ///- `encoding` - Specifies content's encoding to use.
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
     let bytes = matsu!(raw_bytes(body, encoding, limit))?;
 
@@ -227,7 +227,7 @@ pub async fn json<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 ///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>, J: serde::de::DeserializeOwned
 {
     let bytes = matsu!(raw_bytes(body, encoding, limit))?;
 
@@ -245,7 +245,7 @@ pub async fn json_charset<S, I, E, J>(body: S, encoding: ContentEncoding, limit:
 ///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///- `encoding` - Specifies encoding to use.
 pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -> Result<File, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>
 {
     let mut file = io::BufWriter::new(file);
 
@@ -292,7 +292,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
 ///- `encoding` - Specifies encoding to use.
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: ContentEncoding, limit: Option<usize>, mut notify: N) -> Result<bytes::Bytes, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>
 {
     let (limit, buffer_size) = calculate_buffer_size(limit);
 
@@ -337,7 +337,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
 ///- `encoding` - Specifies content's encoding to use.
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>
 {
     let bytes = matsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -354,7 +354,7 @@ pub async fn text_notify<S, I, E, N: Notifier>(body: S, encoding: ContentEncodin
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 ///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<String, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, N: Notifier,
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>, N: Notifier
 {
     let bytes = matsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -372,7 +372,7 @@ pub async fn text_charset_notify<S, I, E, N>(body: S, encoding: ContentEncoding,
 ///- `encoding` - Specifies content's encoding to use.
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, notify: N) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
     let bytes = matsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -389,7 +389,7 @@ pub async fn json_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limi
 ///- `limit` - Specifies limit on body size, if not specified uses default 4kb
 ///- `charset` - Specifies charset to use, if omitted assumes `UTF-8`. Available only with feature `encoding`
 pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncoding, limit: Option<usize>, charset: &'static Encoding, notify: N) -> Result<J, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>, J: serde::de::DeserializeOwned, N: Notifier
 {
     let bytes = matsu!(raw_bytes_notify(body, encoding, limit, notify))?;
 
@@ -407,7 +407,7 @@ pub async fn json_charset_notify<S, I, E, N, J>(body: S, encoding: ContentEncodi
 ///- `body` - Stream of data chunks to read. If limit is hit, body is not exhausted completely.
 ///- `encoding` - Specifies encoding to use.
 pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding: ContentEncoding, mut notify: N) -> Result<File, BodyReadError>
-    where S: StreamExt<Item=Result<I, E>> + Unpin, I: Into<bytes::Bytes>, E: Into<BodyReadError>,
+    where S: HttpBody<Data=I, Error=E> + Unpin, I: Into<bytes::Bytes> + bytes::Buf, E: Into<BodyReadError>
 {
     let mut file = io::BufWriter::new(file);
 

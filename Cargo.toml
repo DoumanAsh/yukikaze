@@ -21,6 +21,7 @@ optional = true
 default-features = false
 
 [dependencies]
+http-body = "0.2.0-alpha"
 http = "0.1"
 percent-encoding = "2.1"
 bytes = "0.4"
@@ -50,8 +51,6 @@ getrandom = { version = "0", optional = true }
 
 derive_more = "0.15"
 async-timer = { version = "0.5", features = ["tokio_on"] }
-
-futures-util-preview = "0.3.0-alpha"
 
 [package.metadata.docs.rs]
 features = ["client", "encoding", "websocket", "docs"]
