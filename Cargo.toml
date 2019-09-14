@@ -4,6 +4,7 @@ version = "1.0.0-alpha.7"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
+documentation = "https://docs.rs/yukikaze"
 repository = "https://gitlab.com/Douman/yukikaze"
 license = "Apache-2.0"
 keywords = ["http", "http-client"]
