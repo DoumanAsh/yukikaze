@@ -50,7 +50,7 @@ data-encoding = { version = "2", optional = true }
 getrandom = { version = "0", optional = true }
 
 derive_more = "0.15"
-async-timer = { version = "0.5", features = ["tokio_on"] }
+async-timer = { version = "0.6", features = ["tokio_on"] }
 
 [package.metadata.docs.rs]
 features = ["client", "encoding", "websocket", "docs"]
