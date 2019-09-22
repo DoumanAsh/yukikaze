@@ -26,6 +26,31 @@
 //!- `websocket` - Enables Websocket Upgrade mechanism. Default `off`. Enables `carry_extensions` when `on`.
 //!- `carry_extensions` - Carries `http::Extensions` from request to resolved `Response`. Default `off`.
 //!
+//!## Examples
+//!
+//!### Client
+//!
+//!```rust,no_run
+//!use yukikaze::client::Request;
+//!
+//!mod global {
+//!    yukikaze::declare_global_client!();
+//!}
+//!
+//!use global::{GlobalRequest};
+//!
+//!async fn google() {
+//!    let res = Request::get("https://google.com").expect("To create get request")
+//!                                                .empty()
+//!                                                .global() //Makes request to go to global client
+//!                                                .send();
+//!    let result = yukikaze::matsu!(res).expect("To get without timeout")
+//!                                      .expect("Successful response");
+//!    assert!(result.is_success());
+//!}
+//!```
+//!
+
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png", html_favicon_url = "https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png")]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]

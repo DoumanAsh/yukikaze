@@ -13,8 +13,6 @@
 //!### Simple
 //!
 //!```rust, no_run
-//!#![feature(async_await)]
-//!
 //!use yukikaze::{matsu, client};
 //!
 //!async fn example() {
@@ -32,7 +30,6 @@
 //!### Custom configuration
 //!
 //!```rust, no_run
-//!#![feature(async_await)]
 //!use yukikaze::{matsu, client};
 //!
 //!use core::time;

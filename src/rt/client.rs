@@ -8,7 +8,6 @@
 //!## Usage
 //!
 //!```rust,no_run
-//!#![feature(async_await)]
 //!use yukikaze::client::Request;
 //!
 //!mod generated {
@@ -58,6 +57,10 @@
 ///
 ///See [usage](rt/client/index.html)
 macro_rules! declare_global_client {
+    () => {
+        use $crate::client::config::DefaultCfg;
+        $crate::declare_global_client!(DefaultCfg);
+    };
     ($config:ty) => {
         $crate::lazy_static::lazy_static! {
             ///Global client instance
@@ -139,10 +142,6 @@ macro_rules! declare_global_client {
                 GLOBAL_CLIENT.redirect_request(self.0)
             }
         }
-    };
-    () => {
-        use $crate::client::config::DefaultCfg;
-        declare_global_client!(DefaultCfg);
     };
 }
 
