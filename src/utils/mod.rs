@@ -37,7 +37,6 @@ macro_rules! unreach {
 
 pub mod fut;
 pub mod enc;
-pub(crate) mod http;
 
 ///Option extensions
 pub trait OptionExt<T> {

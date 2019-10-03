@@ -5,7 +5,8 @@ use std::fs::File;
 
 use super::BodyReadError;
 use crate::header::ContentEncoding;
-use crate::utils::http::Body as HttpBody;
+
+use http_body::Body as HttpBody;
 
 #[cfg(feature = "encoding")]
 use encoding_rs::Encoding;
