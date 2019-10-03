@@ -19,7 +19,6 @@
 //!
 //!## Available cargo features
 //!
-//!- `client` - Enables client module. By default `on`.
 //!- `rustls` - Enables use of `rustls` for default SSL implementation. By default `on`.
 //!- `compu` - Enables compression support. By default `on`.
 //!- `encoding` - Enables `encoding` crate support. Default `off`.
@@ -60,11 +59,9 @@ pub mod utils;
 pub mod header;
 pub mod extractor;
 pub mod upgrade;
-#[cfg(feature = "client")]
 pub mod client;
 #[macro_use]
 pub mod rt;
-#[cfg(feature = "client")]
 pub mod connector;
 
 pub extern crate mime;
@@ -80,19 +77,11 @@ pub extern crate encoding_rs;
 pub extern crate compu;
 #[cfg(feature = "websocket")]
 pub extern crate sha1;
-#[cfg(feature = "client")]
 pub extern crate hyper;
-#[cfg(feature = "client")]
 pub extern crate etag;
-#[cfg(feature = "client")]
 pub extern crate cookie;
-#[cfg(feature = "client")]
 pub extern crate serde;
-#[cfg(feature = "client")]
 pub extern crate serde_json;
-#[cfg(feature = "client")]
 pub extern crate serde_urlencoded;
-#[cfg(feature = "client")]
 pub extern crate data_encoding;
-#[cfg(feature = "client")]
 pub extern crate httpdate;

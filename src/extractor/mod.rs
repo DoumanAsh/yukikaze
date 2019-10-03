@@ -41,7 +41,6 @@ pub enum BodyReadError {
     ///
     ///Convertion from `io::Error` creates this  variant
     ReadError(io::Error),
-    #[cfg(feature = "client")]
     #[display(fmt = "Failed to read due to HTTP error: {}", "_0")]
     ///Hyper's error.
     ///
@@ -70,7 +69,6 @@ impl From<io::Error> for BodyReadError {
     }
 }
 
-#[cfg(feature = "client")]
 impl From<hyper::Error> for BodyReadError {
     #[inline]
     fn from(err: hyper::Error) -> Self {

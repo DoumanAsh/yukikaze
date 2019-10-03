@@ -22,13 +22,11 @@ pub trait Upgrade {
     fn verify_response(status: http::StatusCode, headers: &http::HeaderMap, extensions: &http::Extensions) -> Result<(), Self::VerifyError>;
 }
 
-#[cfg(feature = "client")]
-pub(crate) type UpgradeRes = Result<(hyper::Response<hyper::Body>, hyper::upgrade::Upgraded), hyper::Error>;
-#[cfg(feature = "client")]
+pub(crate) type UpgradeRes = Result<(http::Response<hyper::Body>, hyper::upgrade::Upgraded), hyper::Error>;
 ///Utility to upgrade using hyper's upgrade mechanism
 pub async fn upgrade_response(parts: http::response::Parts, body: hyper::upgrade::OnUpgrade) -> UpgradeRes {
     matsu!(body).map(|upgraded| {
-        let response = hyper::Response::from_parts(parts, hyper::Body::empty());
+        let response = http::Response::from_parts(parts, hyper::Body::empty());
         (response, upgraded)
     })
 }

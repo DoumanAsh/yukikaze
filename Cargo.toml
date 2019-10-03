@@ -18,7 +18,6 @@ edition = "2018"
 
 [dependencies.hyper]
 version = "0.13.0-alpha"
-optional = true
 default-features = false
 
 [dependencies]
@@ -35,37 +34,36 @@ tokio-net = { version = "0.2.0-alpha", features = ["tcp"] }
 
 sha-1 = { version = "0", optional = true }
 tokio-rustls = { version = "0.12.0-alpha", optional = true }
-tokio-io = { version = "0.2.0-alpha", default-features = false, optional = true }
-tokio-executor = { version = "0.2.0-alpha", default-features = false, optional = true }
 webpki-roots = { version = "0.17", optional = true }
+
+tokio-io = { version = "0.2.0-alpha", default-features = false, optional = true }
+tokio-executor = { version = "0.2.0-alpha", default-features = false }
 
 serde = "1"
 serde_json = "1"
 cookie = "0.12"
-httpdate = { version = "0.3", optional = true }
-etag = { version = "1", optional = true }
-serde_urlencoded = { version = "0.6", optional = true }
+httpdate = "0.3"
+etag = "1"
+serde_urlencoded = "0.6"
 
 encoding_rs = { version = "0.8", optional = true }
-data-encoding = { version = "2", optional = true }
+data-encoding = "2"
 getrandom = { version = "0", optional = true }
 
 derive_more = "0.15"
 async-timer = { version = "0.6", features = ["tokio_on"] }
 
 [package.metadata.docs.rs]
-features = ["client", "encoding", "websocket", "docs"]
+features = ["encoding", "websocket", "docs"]
 
 [features]
-default = ["client", "rustls-on", "compu"]
+default = ["rustls-on", "compu"]
 # Enables usage of rustls, which replaces default connectors
 rustls-on = ["tokio-rustls", "webpki-roots", "tokio-io"]
-# Enables client
-client = ["hyper", "serde_urlencoded", "data-encoding", "etag", "httpdate", "tokio-executor"]
 # Enables encoding/decoding of text content
 encoding = ["encoding_rs"]
 # Enables websocket upgrade
-websocket = ["sha-1", "getrandom", "carry_extensions", "hyper", "data-encoding"]
+websocket = ["sha-1", "getrandom", "carry_extensions"]
 # Specifies that documentation is being generated
 docs = []
 
