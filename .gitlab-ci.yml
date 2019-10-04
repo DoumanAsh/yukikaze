@@ -2,7 +2,7 @@ stages:
     - test
 
 test:cargo:
-    image: "rustlang/rust:nightly"
+    image: "rustlang/rust:beta"
     stage: test
     script:
         - rustc --version && cargo --version
