@@ -1,0 +1,23 @@
+[package]
+name = "yukikaze"
+version = "2.0.0"
+authors = ["Douman <douman@gmx.se>"]
+description = "Beautiful and elegant HTTP library."
+readme = "README.md"
+documentation = "https://docs.rs/yukikaze"
+repository = "https://gitlab.com/Douman/yukikaze"
+license = "Apache-2.0"
+keywords = ["http", "http-client"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+categories = ["web-programming::http-client"]
+edition = "2018"
+
+[dependencies.httparse]
+version = "1"
+default-features = false
+
+[dependencies]
