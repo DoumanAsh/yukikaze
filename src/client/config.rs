@@ -5,7 +5,6 @@ use core::time;
 
 use crate::utils;
 use crate::header;
-use crate::connector::Connector;
 
 ///Default timer, which is used by [DefaultCfg](struct.DefaultCfg.html)
 pub type DefaultTimer = async_timer::oneshot::Timer;
@@ -22,7 +21,7 @@ pub type DefaultConnector = crate::connector::HttpConnector;
 ///and provided with sane defaults
 pub trait Config {
     ///Connector type.
-    type Connector: Connector;
+    type Connector: hyper::service::Service<hyper::Uri> + Default + Clone + Send + Sync;
     ///Timer type.
     type Timer: async_timer::oneshot::Oneshot;
 
@@ -68,13 +67,13 @@ pub trait Config {
         Self::default_user_agent(request);
 
         if !request.headers().contains_key(header::HOST) {
-            let host = request.uri().host().and_then(|host| match request.uri().port_part().map(|port| port.as_u16()) {
+            let host = request.uri().host().and_then(|host| match request.uri().port().map(|port| port.as_u16()) {
                 None | Some(80) | Some(443) => header::HeaderValue::from_str(host).ok(),
                 Some(port) => {
                     let mut buffer = utils::BytesWriter::with_capacity(host.len() + 5);
                     let _ = write!(&mut buffer, "{}:{}", host, port);
 
-                    http::header::HeaderValue::from_shared(buffer.freeze()).ok()
+                    http::header::HeaderValue::from_maybe_shared(buffer.freeze()).ok()
                 },
             });
 
@@ -115,34 +114,4 @@ pub struct DefaultCfg;
 impl Config for DefaultCfg {
     type Connector = DefaultConnector;
     type Timer = DefaultTimer;
-}
-
-pub(crate) struct DefaultExecutor;
-
-use tokio_executor::Executor;
-
-impl Executor for DefaultExecutor {
-    #[inline]
-    fn spawn(&mut self, future: core::pin::Pin<Box<dyn core::future::Future<Output = ()> + Send>>) -> Result<(), tokio_executor::SpawnError> {
-        let mut exec = tokio_executor::DefaultExecutor::current();
-        exec.spawn(future)
-    }
-
-    #[inline]
-    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        let exec = tokio_executor::DefaultExecutor::current();
-        exec.status()
-    }
-}
-
-impl Executor for &DefaultExecutor {
-    fn spawn(&mut self, future: core::pin::Pin<Box<dyn core::future::Future<Output = ()> + Send>>) -> Result<(), tokio_executor::SpawnError> {
-        let mut exec = tokio_executor::DefaultExecutor::current();
-        exec.spawn(future)
-    }
-
-    fn status(&self) -> Result<(), tokio_executor::SpawnError> {
-        let exec = tokio_executor::DefaultExecutor::current();
-        exec.status()
-    }
 }

@@ -59,10 +59,10 @@ pub mod utils;
 pub mod header;
 pub mod extractor;
 pub mod upgrade;
+pub mod connector;
 pub mod client;
 #[macro_use]
 pub mod rt;
-pub mod connector;
 
 pub extern crate mime;
 pub extern crate lazy_static;
