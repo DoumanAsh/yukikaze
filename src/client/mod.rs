@@ -91,13 +91,17 @@ impl<C: config::Config> fmt::Debug for Client<C> {
 ///Alias to result of sending request.
 pub type RequestResult = Result<response::Response, hyper::Error>;
 
-impl<C: config::Config> Client<C> {
+use tokio::io::{AsyncRead, AsyncWrite};
+
+impl<C: config::Config> Client<C> where <C::Connector as hyper::service::Service<hyper::Uri>>::Error: Into<Box<dyn std::error::Error + Send + Sync + 'static>>,
+                                        <C::Connector as hyper::service::Service<hyper::Uri>>::Future: Send + Unpin,
+                                        <C::Connector as hyper::service::Service<hyper::Uri>>::Response: AsyncRead + AsyncWrite + hyper::client::connect::Connection + Unpin + Send
+{
     ///Creates new instance of client with specified configuration.
     ///
     ///Use `Default` if you'd like to use [default](config/struct.DefaultCfg.html) config.
     pub fn new() -> Client<C> {
-        use crate::connector::Connector;
-        let inner = C::config_hyper(&mut hyper::Client::builder()).executor(config::DefaultExecutor).build(C::Connector::new());
+        let inner = C::config_hyper(&mut hyper::Client::builder()).build(C::Connector::default());
 
         Self {
             inner,
@@ -256,12 +260,12 @@ impl<C: config::Config> Client<C> {
             }
 
             let location = match res.headers().get(header::LOCATION).and_then(|loc| loc.to_str().ok()).and_then(|loc| loc.parse::<hyper::Uri>().ok()) {
-                Some(loc) => match loc.scheme_part().is_some() {
+                Some(loc) => match loc.scheme().is_some() {
                     //We assume that if scheme is present then it is absolute redirect
                     true => {
                         //Well, it is unlikely that host would be empty, but just in case, right?
-                        if let Some(prev_host) = uri.authority_part().map(|part| part.host()) {
-                            match loc.authority_part().map(|part| part.host() == prev_host).unwrap_or(false) {
+                        if let Some(prev_host) = uri.authority().map(|part| part.host()) {
+                            match loc.authority().map(|part| part.host() == prev_host).unwrap_or(false) {
                                 true => (),
                                 false => {
                                     headers.remove("authorization");
@@ -282,8 +286,8 @@ impl<C: config::Config> Client<C> {
                         let loc = loc.to_str().expect("Valid UTF-8 path").parse::<hyper::Uri>().expect("Valid URI");
                         let mut loc_parts = loc.into_parts();
 
-                        loc_parts.scheme = uri.scheme_part().cloned();
-                        loc_parts.authority = uri.authority_part().cloned();
+                        loc_parts.scheme = uri.scheme().cloned();
+                        loc_parts.authority = uri.authority().cloned();
 
                         hyper::Uri::from_parts(loc_parts).expect("Create redirect URI")
                     },

@@ -74,7 +74,7 @@ pub struct WebsocketUpgradeOpts {
 impl WebsocketUpgradeOpts {
     #[inline(always)]
     fn apply(self, headers: &mut http::HeaderMap) {
-        match headers.entry(http::header::SEC_WEBSOCKET_PROTOCOL).expect("Valid header name") {
+        match headers.entry(http::header::SEC_WEBSOCKET_PROTOCOL) {
             http::header::Entry::Vacant(entry) => {
                 entry.insert(http::header::HeaderValue::from_static(self.protocols));
             },
@@ -97,23 +97,26 @@ impl super::Upgrade for WebsocketUpgrade {
         let encode_len = BASE64.encode_len(sec_key.len());
         let mut key = bytes::BytesMut::with_capacity(encode_len);
         unsafe {
-            BASE64.encode_mut(&sec_key, &mut key.bytes_mut()[..encode_len]);
+            {
+                let dest = &mut *(&mut key.bytes_mut()[..encode_len] as *mut [core::mem::MaybeUninit<u8>] as *mut [u8]);
+                BASE64.encode_mut(&sec_key, dest)
+            }
             key.advance_mut(encode_len);
         }
         let key = key.freeze();
         let stored_key = SecKey(key.clone());
         extensions.insert(stored_key);
 
-        let key = unsafe { http::header::HeaderValue::from_shared_unchecked(key) };
+        let key = unsafe { http::header::HeaderValue::from_maybe_shared_unchecked(key) };
 
-        match headers.entry(http::header::CONNECTION).expect("Valid header name") {
+        match headers.entry(http::header::CONNECTION) {
             http::header::Entry::Vacant(entry) => {
                 entry.insert(http::header::HeaderValue::from_static(CONNECTION_TYPE));
             },
             _ => (),
         }
 
-        match headers.entry(http::header::UPGRADE).expect("Valid header name") {
+        match headers.entry(http::header::UPGRADE) {
             http::header::Entry::Vacant(entry) => {
                 entry.insert(http::header::HeaderValue::from_static(UPGRADE_NAME));
             },

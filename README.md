@@ -3,7 +3,7 @@
 [![Build](https://gitlab.com/Douman/yukikaze/badges/master/build.svg)](https://gitlab.com/Douman/yukikaze/pipelines)
 [![Crates.io](https://img.shields.io/crates/v/yukikaze.svg)](https://crates.io/crates/yukikaze)
 [![Documentation](https://docs.rs/yukikaze/badge.svg)](https://docs.rs/crate/yukikaze/)
-[![dependency status](https://deps.rs/crate/yukikaze/1.0.0-alpha.8/status.svg)](https://deps.rs/crate/yukikaze)
+[![dependency status](https://deps.rs/crate/yukikaze/1.0.0/status.svg)](https://deps.rs/crate/yukikaze)
 
 ![Yukikaze image](https://gitlab.com/Douman/yukikaze/raw/master/Yukikaze.png)
 
@@ -21,7 +21,6 @@ Beautiful and elegant Yukikaze is little HTTP client library based on [hyper](ht
 
 ## Available cargo features
 
-- `client` - Enables client module. By default `on`.
 - `rustls` - Enables use of `rustls` for default SSL implementation. By default `on`
 - `compu` - Enables compression support. By default `on`.
 - `encoding` - Enables `encoding` crate support. Default `off`.

@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.0-alpha.8"
+version = "1.0.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -17,27 +17,25 @@ categories = ["web-programming::http-client"]
 edition = "2018"
 
 [dependencies.hyper]
-version = "0.13.0-alpha"
+version = "0.13"
 default-features = false
+features = ["tcp"]
 
 [dependencies]
-http-body = "0.2.0-alpha"
-http = "0.1"
+http-body = "0.3"
+http = "0.2"
 percent-encoding = "2.1"
-bytes = "0.4"
+bytes = "0.5"
 mime = "0.3"
 mime_guess = "2"
 compu = { version = "0.4", optional = true, default-features = false, features = ["brotli-c", "zlib"] }
 lazy_static = "1"
 
-tokio-net = { version = "0.2.0-alpha", features = ["tcp"] }
+tokio = { version = "0.2", features = ["net"] }
 
 sha-1 = { version = "0", optional = true }
-tokio-rustls = { version = "0.12.0-alpha", optional = true }
+tokio-rustls = { version = "0.12", optional = true }
 webpki-roots = { version = "0.18", optional = true }
-
-tokio-io = { version = "0.2.0-alpha", default-features = false, optional = true }
-tokio-executor = { version = "0.2.0-alpha", default-features = false }
 
 serde = "1"
 serde_json = "1"
@@ -50,8 +48,8 @@ encoding_rs = { version = "0.8", optional = true }
 data-encoding = "2"
 getrandom = { version = "0", optional = true }
 
-derive_more = "0.15"
-async-timer = { version = "0.6", features = ["tokio_on"] }
+derive_more = "0.99"
+async-timer = { version = "0.7", features = ["tokio_on"] }
 
 [package.metadata.docs.rs]
 features = ["encoding", "websocket", "docs"]
@@ -59,7 +57,7 @@ features = ["encoding", "websocket", "docs"]
 [features]
 default = ["rustls-on", "compu"]
 # Enables usage of rustls, which replaces default connectors
-rustls-on = ["tokio-rustls", "webpki-roots", "tokio-io"]
+rustls-on = ["tokio-rustls", "webpki-roots"]
 # Enables encoding/decoding of text content
 encoding = ["encoding_rs"]
 # Enables websocket upgrade
@@ -71,4 +69,4 @@ docs = []
 carry_extensions = []
 
 [dev-dependencies]
-tokio = { version = "0.2.0-alpha", default-features = false, features = ["rt-full"] }
+tokio = { version = "0.2.0", default-features = false, features = ["rt-core", "macros"] }

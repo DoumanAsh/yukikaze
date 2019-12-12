@@ -1,11 +1,10 @@
 //! Rustls connector
 
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::client::TlsStream;
-use hyper::client::connect::{self, Connected, Connect};
 
-use super::super::{HttpConnector, Connector};
-use crate::utils::{self, OptionExt};
+use super::super::{HttpConnector};
+use crate::utils;
 
 use std::io;
 use std::sync::Arc;
@@ -13,6 +12,63 @@ use core::fmt;
 use core::future::Future;
 use core::task::{Poll, Context};
 use core::pin::{Pin};
+use core::mem::MaybeUninit;
+
+///HTTPS Stream
+pub struct HttpsStream<T> {
+    inner: TlsStream<T>,
+}
+
+impl hyper::client::connect::Connection for HttpsStream<tokio::net::TcpStream> {
+    fn connected(&self) -> hyper::client::connect::Connected {
+        self.inner.get_ref().0.connected()
+    }
+}
+
+impl<T: AsyncRead + AsyncWrite + Unpin> AsyncRead for HttpsStream<T> {
+    #[inline(always)]
+    unsafe fn prepare_uninitialized_buffer(&self, buff: &mut [MaybeUninit<u8>]) -> bool {
+        self.inner.prepare_uninitialized_buffer(buff)
+    }
+
+    #[inline(always)]
+    fn poll_read(mut self: Pin<&mut Self>, ctx: &mut Context<'_>, buff: &mut [u8]) -> Poll<io::Result<usize>> {
+        AsyncRead::poll_read(Pin::new(&mut self.inner), ctx, buff)
+    }
+}
+
+impl<T: AsyncRead + AsyncWrite + Unpin> AsyncWrite for HttpsStream<T> {
+    #[inline(always)]
+    fn poll_write(mut self: Pin<&mut Self>, ctx: &mut Context<'_>, buff: &[u8]) -> Poll<io::Result<usize>> {
+        AsyncWrite::poll_write(Pin::new(&mut self.inner), ctx, buff)
+    }
+
+    #[inline(always)]
+    fn poll_flush(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        AsyncWrite::poll_flush(Pin::new(&mut self.inner), ctx)
+    }
+
+    #[inline(always)]
+    fn poll_shutdown(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        AsyncWrite::poll_shutdown(Pin::new(&mut self.inner), ctx)
+    }
+}
+
+impl<T> From<TlsStream<T>> for HttpsStream<T> {
+    #[inline(always)]
+    fn from(tls: TlsStream<T>) -> Self {
+        HttpsStream {
+            inner: tls,
+        }
+    }
+}
+
+impl<T> Into<TlsStream<T>> for HttpsStream<T> {
+    #[inline(always)]
+    fn into(self) -> TlsStream<T> {
+        self.inner
+    }
+}
 
 /// A stream that might be protected with TLS.
 pub enum MaybeHttpsStream<T> {
@@ -20,6 +76,15 @@ pub enum MaybeHttpsStream<T> {
     Http(T),
     /// A stream protected with TLS.
     Https(TlsStream<T>),
+}
+
+impl hyper::client::connect::Connection for MaybeHttpsStream<tokio::net::TcpStream> {
+    fn connected(&self) -> hyper::client::connect::Connected {
+        match self {
+            MaybeHttpsStream::Http(tcp) => tcp.connected(),
+            MaybeHttpsStream::Https(tls) => tls.get_ref().0.connected(),
+        }
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for MaybeHttpsStream<T> {
@@ -32,7 +97,7 @@ impl<T: fmt::Debug> fmt::Debug for MaybeHttpsStream<T> {
 }
 
 impl<T: AsyncRead + AsyncWrite + Unpin> AsyncRead for MaybeHttpsStream<T> {
-    unsafe fn prepare_uninitialized_buffer(&self, buff: &mut [u8]) -> bool {
+    unsafe fn prepare_uninitialized_buffer(&self, buff: &mut [MaybeUninit<u8>]) -> bool {
         match *self {
             MaybeHttpsStream::Http(ref s) => s.prepare_uninitialized_buffer(buff),
             MaybeHttpsStream::Https(ref s) => s.prepare_uninitialized_buffer(buff),
@@ -78,13 +143,13 @@ pub struct HttpsConnector {
     config: Arc<tokio_rustls::rustls::ClientConfig>,
 }
 
-impl Connector for HttpsConnector {
-    fn new() -> Self {
+impl Default for HttpsConnector {
+    fn default() -> Self {
         let mut config = tokio_rustls::rustls::ClientConfig::new();
         config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
         Self {
-            http: HttpConnector::new(),
+            http: HttpConnector::default(),
             config: Arc::new(config),
         }
     }
@@ -96,17 +161,22 @@ impl fmt::Debug for HttpsConnector {
     }
 }
 
-impl Connect for HttpsConnector {
-    type Transport = MaybeHttpsStream<<HttpConnector as Connect>::Transport>;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
-    type Future = utils::fut::Either<MaybeHttpsConnecting<<HttpConnector as Connect>::Future>, MaybeHttpConnecting<<HttpConnector as Connect>::Future>>;
+impl hyper::service::Service<hyper::Uri> for HttpsConnector {
+    type Response = MaybeHttpsStream<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>;
+    type Error = io::Error;
+    type Future = utils::fut::Either<MaybeHttpsConnecting<<HttpConnector as hyper::service::Service<hyper::Uri>>::Future>, MaybeHttpConnecting<<HttpConnector as hyper::service::Service<hyper::Uri>>::Future>>;
 
-    fn connect(&self, dst: connect::Destination) -> Self::Future {
-        let is_https = dst.scheme() == "https";
+    #[inline(always)]
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.http.poll_ready(ctx).map_err(Into::into)
+    }
+
+    fn call(&mut self, dst: hyper::Uri) -> Self::Future {
+        let is_https = dst.scheme().unwrap().as_str() == "https";
 
         match is_https {
             true => {
-                let state = HttpsOnlyConnectingState::Conneting(self.http.connect(dst.clone()));
+                let state = HttpsOnlyConnectingState::Conneting(self.http.call(dst.clone()));
 
                 let fut = HttpsOnlyConnecting {
                     dst,
@@ -117,7 +187,7 @@ impl Connect for HttpsConnector {
                 utils::fut::Either::Left(MaybeHttpsConnecting(fut))
             },
             false => {
-                utils::fut::Either::Right(MaybeHttpConnecting(self.http.connect(dst)))
+                utils::fut::Either::Right(MaybeHttpConnecting(self.http.call(dst)))
             }
         }
     }
@@ -133,14 +203,14 @@ pub struct HttpsOnlyConnector {
     config: Arc<tokio_rustls::rustls::ClientConfig>,
 }
 
-impl Connector for HttpsOnlyConnector {
+impl Default for HttpsOnlyConnector {
     ///Creates new instance with specified connector.
-    fn new() -> Self {
+    fn default() -> Self {
         let mut config = tokio_rustls::rustls::ClientConfig::new();
         config.root_store.add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
 
         Self {
-            http: HttpConnector::new(),
+            http: HttpConnector::default(),
             config: Arc::new(config),
         }
     }
@@ -152,13 +222,18 @@ impl fmt::Debug for HttpsOnlyConnector {
     }
 }
 
-impl Connect for HttpsOnlyConnector {
-    type Transport = TlsStream<<HttpConnector as Connect>::Transport>;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
-    type Future = HttpsOnlyConnecting<<HttpConnector as Connect>::Future>;
+impl hyper::service::Service<hyper::Uri> for HttpsOnlyConnector {
+    type Response = HttpsStream<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>;
+    type Error = io::Error;
+    type Future = HttpsOnlyConnecting<<HttpConnector as hyper::service::Service<hyper::Uri>>::Future>;
 
-    fn connect(&self, dst: connect::Destination) -> Self::Future {
-        let state = HttpsOnlyConnectingState::Conneting(self.http.connect(dst.clone()));
+    #[inline(always)]
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.http.poll_ready(ctx)
+    }
+
+    fn call(&mut self, dst: hyper::Uri) -> Self::Future {
+        let state = HttpsOnlyConnectingState::Conneting(self.http.call(dst.clone()));
 
         HttpsOnlyConnecting {
             dst,
@@ -170,18 +245,18 @@ impl Connect for HttpsOnlyConnector {
 
 enum HttpsOnlyConnectingState<T> {
     Conneting(T),
-    Tls(tokio_rustls::Connect<tokio_net::tcp::TcpStream>, Option<Connected>),
+    Tls(tokio_rustls::Connect<tokio::net::TcpStream>),
 }
 
 ///Ongoing HTTPS only connect
 pub struct HttpsOnlyConnecting<T> {
-    dst: connect::Destination,
+    dst: hyper::Uri,
     config: Arc<tokio_rustls::rustls::ClientConfig>,
     state: HttpsOnlyConnectingState<T>,
 }
 
-impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transport, Connected)>>> Future for HttpsOnlyConnecting<F> {
-    type Output = Result<(TlsStream<<HttpConnector as Connect>::Transport>, Connected), Box<dyn std::error::Error + Send + Sync>>;
+impl<F: Unpin + Future<Output = io::Result<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>>> Future for HttpsOnlyConnecting<F> {
+    type Output = Result<HttpsStream<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>, io::Error>;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         use tokio_rustls::rustls::Session;
@@ -191,22 +266,22 @@ impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transpor
             self.state = match self.state {
                 HttpsOnlyConnectingState::Conneting(ref mut connecting) => match Future::poll(unsafe { Pin::new_unchecked(connecting) }, ctx) {
                     Poll::Pending => return Poll::Pending,
-                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error.into())),
-                    Poll::Ready(Ok((tcp, conn))) => match DNSNameRef::try_from_ascii_str(self.dst.host()) {
+                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                    Poll::Ready(Ok(tcp)) => match DNSNameRef::try_from_ascii_str(self.dst.host().unwrap()) {
                         Ok(dns_name) => {
                             let cfg = self.config.clone();
                             let connector = tokio_rustls::TlsConnector::from(cfg);
-                            HttpsOnlyConnectingState::Tls(connector.connect(dns_name, tcp), Some(conn))
+                            HttpsOnlyConnectingState::Tls(connector.connect(dns_name, tcp))
                         },
-                        Err(_) => return Poll::Ready(Err("invalid DNS name".into())),
+                        Err(_) => return Poll::Ready(Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid DNS name"))),
                     }
                 },
-                HttpsOnlyConnectingState::Tls(ref mut connecting, ref mut conn) => match Future::poll(unsafe { Pin::new_unchecked(connecting) }, ctx) {
+                HttpsOnlyConnectingState::Tls(ref mut connecting) => match Future::poll(unsafe { Pin::new_unchecked(connecting) }, ctx) {
                     Poll::Pending => return Poll::Pending,
-                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error.into())),
+                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                     Poll::Ready(Ok(tls)) => match tls.get_ref().1.get_alpn_protocol() {
-                        Some(b"h2") => return Poll::Ready(Ok((tls, conn.take().unreach_none().negotiated_h2()))),
-                        _ => return Poll::Ready(Ok((tls, conn.take().unreach_none()))),
+                        Some(b"h2") => return Poll::Ready(Ok(tls.into())),
+                        _ => return Poll::Ready(Ok(tls.into())),
                     }
                 }
             }
@@ -217,23 +292,23 @@ impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transpor
 ///Ongoing HTTPS connect
 pub struct MaybeHttpsConnecting<T>(HttpsOnlyConnecting<T>);
 
-impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transport, Connected)>>> Future for MaybeHttpsConnecting<F> {
-    type Output = Result<(MaybeHttpsStream<<HttpConnector as Connect>::Transport>, Connected), Box<dyn std::error::Error + Send + Sync>>;
+impl<F: Unpin + Future<Output = io::Result<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>>> Future for MaybeHttpsConnecting<F> {
+    type Output = Result<MaybeHttpsStream<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = unsafe { self.map_unchecked_mut(|this| &mut this.0) };
-        Future::poll(inner, ctx).map(|res| res.map(|(tls, conn)| (MaybeHttpsStream::Https(tls), conn)))
+        Future::poll(inner, ctx).map(|res| res.map(|tls| MaybeHttpsStream::Https(tls.into())))
     }
 }
 
 ///Ongoing HTTP connect
 pub struct MaybeHttpConnecting<T>(T);
 
-impl<F: Unpin + Future<Output = io::Result<(<HttpConnector as Connect>::Transport, Connected)>>> Future for MaybeHttpConnecting<F> {
-    type Output = Result<(MaybeHttpsStream<<HttpConnector as Connect>::Transport>, Connected), Box<dyn std::error::Error + Send + Sync>>;
+impl<F: Unpin + Future<Output = io::Result<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>>> Future for MaybeHttpConnecting<F> {
+    type Output = Result<MaybeHttpsStream<<HttpConnector as hyper::service::Service<hyper::Uri>>::Response>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let inner = unsafe { self.map_unchecked_mut(|this| &mut this.0) };
-        Future::poll(inner, ctx).map(|res| res.map(|(tcp, conn)| (MaybeHttpsStream::Http(tcp), conn))).map_err(|error| error.into())
+        Future::poll(inner, ctx).map(|res| res.map(|tcp| MaybeHttpsStream::Http(tcp)))
     }
 }

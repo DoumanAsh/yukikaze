@@ -1,11 +1,11 @@
 //!Client request
 
 use core::{mem, fmt};
+use core::convert::TryFrom;
 use std::io::Write;
 
 use crate::{header, utils};
 
-use http::HttpTryFrom;
 use http::header::HeaderValue;
 use bytes::BufMut;
 
@@ -180,7 +180,7 @@ impl Builder {
     ///# Panics
     ///
     ///- On attempt to set invalid header value.
-    pub fn set_header<K: header::IntoHeaderName, V>(mut self, key: K, value: V) -> Self where HeaderValue: HttpTryFrom<V> {
+    pub fn set_header<K: header::IntoHeaderName, V>(mut self, key: K, value: V) -> Self where HeaderValue: TryFrom<V> {
         let value = match HeaderValue::try_from(value) {
             Ok(value) => value,
             Err(_) => panic!("Attempt to set invalid header"),
@@ -197,8 +197,8 @@ impl Builder {
     ///# Panics
     ///
     ///- On attempt to set invalid header value.
-    pub fn set_header_if_none<K: header::AsHeaderName, V>(mut self, key: K, value: V) -> Self where HeaderValue: HttpTryFrom<V> {
-        match self.headers().entry(key).expect("Valid header name") {
+    pub fn set_header_if_none<K: header::IntoHeaderName, V>(mut self, key: K, value: V) -> Self where HeaderValue: TryFrom<V> {
+        match self.headers().entry(key) {
             http::header::Entry::Vacant(entry) => match HeaderValue::try_from(value) {
                 Ok(value) => {
                     entry.insert(value);
@@ -222,7 +222,7 @@ impl Builder {
             None => write!(&mut buffer, "{}", etag),
         };
 
-        let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+        let value = unsafe { http::header::HeaderValue::from_maybe_shared_unchecked(buffer.freeze()) };
         self.headers().insert(E::header_name(), value);
         self
     }
@@ -231,7 +231,7 @@ impl Builder {
     pub fn set_date<E: tags::DateMode>(mut self, date: httpdate::HttpDate, _: E) -> Self {
         let mut buffer = utils::BytesWriter::with_smol_capacity();
         let _ = write!(&mut buffer, "{}", date);
-        let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+        let value = unsafe { http::header::HeaderValue::from_maybe_shared_unchecked(buffer.freeze()) };
 
         self.headers().insert(E::header_name(), value);
         self
@@ -291,7 +291,7 @@ impl Builder {
         let mut buffer = utils::BytesWriter::with_smol_capacity();
 
         let _ = write!(&mut buffer, "{}", disp);
-        let value = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+        let value = unsafe { http::header::HeaderValue::from_maybe_shared_unchecked(buffer.freeze()) };
 
         self.headers().insert(header::CONTENT_DISPOSITION, value);
         self
@@ -309,9 +309,12 @@ impl Builder {
         let header_value = unsafe {
             let mut header_value = bytes::BytesMut::with_capacity(encode_len + BASIC.as_bytes().len());
             header_value.put_slice(BASIC.as_bytes());
-            data_encoding::BASE64.encode_mut(auth.as_bytes(), &mut header_value.bytes_mut()[..encode_len]);
+            {
+                let dest = &mut *(&mut header_value.bytes_mut()[..encode_len] as *mut [core::mem::MaybeUninit<u8>] as *mut [u8]);
+                data_encoding::BASE64.encode_mut(auth.as_bytes(), dest);
+            }
             header_value.advance_mut(encode_len);
-            http::header::HeaderValue::from_shared_unchecked(header_value.freeze())
+            http::header::HeaderValue::from_maybe_shared_unchecked(header_value.freeze())
         };
 
         let _ = self.headers().insert(http::header::AUTHORIZATION, header_value);
@@ -330,7 +333,7 @@ impl Builder {
             let mut header_value = bytes::BytesMut::with_capacity(token.as_bytes().len() + TYPE.as_bytes().len());
             header_value.put_slice(TYPE.as_bytes());
             header_value.put_slice(token.as_bytes());
-            http::header::HeaderValue::from_shared_unchecked(header_value.freeze())
+            http::header::HeaderValue::from_maybe_shared_unchecked(header_value.freeze())
         };
 
         let _ = self.headers().insert(http::header::AUTHORIZATION, header_value);
@@ -356,7 +359,7 @@ impl Builder {
             None => write!(buffer, "?{}", query),
         };
 
-        uri_parts.path_and_query = Some(http::uri::PathAndQuery::from_shared(buffer.into_inner().freeze()).expect("To create path and query"));
+        uri_parts.path_and_query = Some(http::uri::PathAndQuery::from_maybe_shared(buffer.into_inner().freeze()).expect("To create path and query"));
 
         self.parts.uri = match http::Uri::from_parts(uri_parts) {
             Ok(uri) => uri,
@@ -380,6 +383,7 @@ impl Builder {
     ///Adds `Content-Length` if not specified by user.
     ///Following RFC, adds zero length only for `PUT` and `POST` requests
     pub fn body<B: Into<bytes::Bytes>>(mut self, body: Option<B>) -> Request {
+        use bytes::Buf;
         use crate::utils::enc::USER_INFO_ENCODE_SET;
         use percent_encoding::{utf8_percent_encode};
 
@@ -394,8 +398,8 @@ impl Builder {
             }
 
             let mut buffer = buffer.into_inner();
-            buffer.split_to(2);
-            let cookie = unsafe { http::header::HeaderValue::from_shared_unchecked(buffer.freeze()) };
+            buffer.advance(2);
+            let cookie = unsafe { http::header::HeaderValue::from_maybe_shared_unchecked(buffer.freeze()) };
 
             let _ = self.headers().insert(http::header::COOKIE, cookie);
         }
@@ -407,7 +411,7 @@ impl Builder {
         //For everything else we just add Content-Length unless it is already in
         match body.as_ref() {
             None => match self.parts.method {
-                hyper::Method::PUT | hyper::Method::POST => match self.parts.headers.entry(http::header::CONTENT_LENGTH).expect("CONTENT_LENGTH to be valid header key") {
+                hyper::Method::PUT | hyper::Method::POST => match self.parts.headers.entry(http::header::CONTENT_LENGTH) {
                     http::header::Entry::Vacant(value) => {
                         value.insert(utils::content_len_value(0));
                     },
@@ -417,7 +421,7 @@ impl Builder {
                     self.parts.headers.remove(http::header::CONTENT_LENGTH);
                 },
             },
-            Some(body) => match self.parts.headers.entry(http::header::CONTENT_LENGTH).expect("CONTENT_LENGTH to be valid header key") {
+            Some(body) => match self.parts.headers.entry(http::header::CONTENT_LENGTH) {
                 http::header::Entry::Vacant(value) => {
                     value.insert(utils::content_len_value(body.len() as u64));
                 },
@@ -449,7 +453,7 @@ impl Builder {
     pub fn multipart(self, body: multipart::Form) -> Request {
         let mut content_type = utils::BytesWriter::with_capacity(30 + body.boundary.len());
         let _ = write!(&mut content_type, "multipart/form-data; boundary={}", body.boundary);
-        let content_type = unsafe { http::header::HeaderValue::from_shared_unchecked(content_type.freeze()) };
+        let content_type = unsafe { http::header::HeaderValue::from_maybe_shared_unchecked(content_type.freeze()) };
 
         let (_, body) = body.finish();
         self.set_header_if_none(header::CONTENT_TYPE, content_type).body(Some(body))

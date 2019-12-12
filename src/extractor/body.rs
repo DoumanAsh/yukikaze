@@ -32,7 +32,7 @@ macro_rules! impl_compu_bytes {
 
         let mut decoder = compu::decompressor::memory::Decompressor::new($decoder);
 
-        while let Some(chunk) = matsu!($body.next()) {
+        while let Some(chunk) = matsu!($body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match decoder.push(&chunk) {
@@ -56,7 +56,7 @@ macro_rules! impl_compu_bytes {
 
         let mut decoder = compu::decompressor::memory::Decompressor::new($decoder);
 
-        while let Some(chunk) = matsu!($body.next()) {
+        while let Some(chunk) = matsu!($body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             $notify.send(chunk.len());
@@ -85,7 +85,7 @@ macro_rules! impl_compu_file {
 
         let mut decoder = compu::decompressor::write::Decompressor::new($decoder, $file);
 
-        while let Some(chunk) = matsu!($body.next()) {
+        while let Some(chunk) = matsu!($body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match decoder.push(&chunk)? {
@@ -105,7 +105,7 @@ macro_rules! impl_compu_file {
 
         let mut decoder = compu::decompressor::write::Decompressor::new($decoder, $file);
 
-        while let Some(chunk) = matsu!($body.next()) {
+        while let Some(chunk) = matsu!($body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             $notify.send(chunk.len());
@@ -154,7 +154,7 @@ pub async fn raw_bytes<S, I, E>(mut body: S, encoding: ContentEncoding, limit: O
         _ => {
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
 
-            while let Some(chunk) = matsu!(body.next()) {
+            while let Some(chunk) = matsu!(body.data()) {
                 let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 buffer.extend_from_slice(&chunk[..]);
@@ -265,7 +265,7 @@ pub async fn file<S, I, E>(file: File, mut body: S, encoding: ContentEncoding) -
             let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
             impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        _ => while let Some(chunk) = matsu!(body.next()) {
+        _ => while let Some(chunk) = matsu!(body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match file.write_all(&chunk[..]) {
@@ -315,7 +315,7 @@ pub async fn raw_bytes_notify<S, I, E, N: Notifier>(mut body: S, encoding: Conte
         _ => {
             let mut buffer = bytes::BytesMut::with_capacity(buffer_size);
 
-            while let Some(chunk) = matsu!(body.next()) {
+            while let Some(chunk) = matsu!(body.data()) {
                 let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
                 buffer.extend_from_slice(&chunk[..]);
@@ -427,7 +427,7 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
             let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
             impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
         },
-        _ => while let Some(chunk) = matsu!(body.next()) {
+        _ => while let Some(chunk) = matsu!(body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match file.write_all(&chunk[..]) {

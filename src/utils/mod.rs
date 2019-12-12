@@ -134,5 +134,5 @@ impl io::Write for BytesWriter {
 pub fn content_len_value(len: u64) -> crate::http::header::HeaderValue {
     let mut res = BytesWriter::with_capacity(1);
     let _ = write!(&mut res, "{}", len);
-    unsafe { crate::http::header::HeaderValue::from_shared_unchecked(res.freeze()) }
+    unsafe { crate::http::header::HeaderValue::from_maybe_shared_unchecked(res.freeze()) }
 }
