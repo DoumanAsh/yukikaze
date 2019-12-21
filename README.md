@@ -1,6 +1,6 @@
 # 雪風(Yukikaze)
 
-[![Build](https://gitlab.com/Douman/yukikaze/badges/master/build.svg)](https://gitlab.com/Douman/yukikaze/pipelines)
+[![Build](https://gitlab.com/Douman/yukikaze/badges/master/pipeline.svg)](https://gitlab.com/Douman/yukikaze/pipelines)
 [![Crates.io](https://img.shields.io/crates/v/yukikaze.svg)](https://crates.io/crates/yukikaze)
 [![Documentation](https://docs.rs/yukikaze/badge.svg)](https://docs.rs/crate/yukikaze/)
 [![dependency status](https://deps.rs/crate/yukikaze/1.0.0/status.svg)](https://deps.rs/crate/yukikaze)
