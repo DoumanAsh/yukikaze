@@ -89,9 +89,9 @@ macro_rules! impl_compu_file {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
 
             match decoder.push(&chunk)? {
-                DecoderResult::Finished => break,
-                DecoderResult::NeedInput => (),
-                result => return Err(BodyReadError::CompuError(result)),
+                (DecoderResult::Finished, _) => break,
+                (DecoderResult::NeedInput, _) => (),
+                (result, _) => return Err(BodyReadError::CompuError(result)),
             }
         }
 
@@ -110,10 +110,10 @@ macro_rules! impl_compu_file {
 
             $notify.send(chunk.len());
 
-            match decoder.push(&chunk) {
-                DecoderResult::Finished => break,
-                DecoderResult::NeedInput => (),
-                result => return Err(BodyReadError::CompuError(result)),
+            match decoder.push(&chunk)? {
+                (DecoderResult::Finished, _) => break,
+                (DecoderResult::NeedInput, _) => (),
+                (result, _) => return Err(BodyReadError::CompuError(result)),
             }
         }
 
@@ -415,17 +415,17 @@ pub async fn file_notify<S, I, E, N: Notifier>(file: File, mut body: S, encoding
     match encoding {
         #[cfg(feature = "compu")]
         ContentEncoding::Brotli => {
-            impl_compu_file!(compu::decoder::brotli::BrotliDecoder::default(), body, &mut file);
+            impl_compu_file!(compu::decoder::brotli::BrotliDecoder::default(), body, &mut file, notify);
         },
         #[cfg(feature = "compu")]
         ContentEncoding::Gzip => {
             let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Gzip);
-            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
+            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file, notify);
         },
         #[cfg(feature = "compu")]
         ContentEncoding::Deflate => {
             let options = compu::decoder::zlib::ZlibOptions::default().mode(compu::decoder::zlib::ZlibMode::Zlib);
-            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file);
+            impl_compu_file!(compu::decoder::zlib::ZlibDecoder::new(&options), body, &mut file, notify);
         },
         _ => while let Some(chunk) = matsu!(body.data()) {
             let chunk = chunk.map(Into::into).map_err(Into::into)?;
