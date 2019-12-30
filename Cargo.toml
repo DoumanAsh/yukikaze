@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -52,7 +52,7 @@ derive_more = "0.99"
 async-timer = { version = "0.7", features = ["tokio_on"] }
 
 [package.metadata.docs.rs]
-features = ["encoding", "websocket", "docs"]
+features = ["encoding", "websocket", "docs", "compu-brotli-sys/docs"]
 
 [features]
 default = ["rustls-on", "compu"]
