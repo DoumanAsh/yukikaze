@@ -52,7 +52,7 @@ derive_more = "0.99"
 async-timer = { version = "0.7", features = ["tokio_on"] }
 
 [package.metadata.docs.rs]
-features = ["encoding", "websocket", "docs", "compu-brotli-sys/docs"]
+features = ["encoding", "websocket", "docs"]
 
 [features]
 default = ["rustls-on", "compu"]
@@ -63,7 +63,7 @@ encoding = ["encoding_rs"]
 # Enables websocket upgrade
 websocket = ["sha-1", "getrandom", "carry_extensions"]
 # Specifies that documentation is being generated
-docs = []
+docs = ["compu/docs"]
 
 # Stores request's Extensions in response's Extensions
 carry_extensions = []
