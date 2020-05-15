@@ -143,18 +143,15 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.description())
+        match self {
+            &ParseError::InvalidDispositionType => f.write_str("Specified disposition type is not valid. Should be inline, attachment or form-data"),
+            &ParseError::UnknownAttachmentParam => f.write_str("Form-data parameter is invalid. Allowed: filename[*]"),
+            &ParseError::UnknownFormParam => f.write_str("Form-data parameter is invalid. Allowed: name, filename[*]"),
+        }
     }
 }
 
 impl Error for ParseError {
-    fn description(&self) -> &str {
-        match self {
-            &ParseError::InvalidDispositionType => "Specified disposition type is not valid. Should be inline, attachment or form-data",
-            &ParseError::UnknownAttachmentParam => "Form-data parameter is invalid. Allowed: filename[*]",
-            &ParseError::UnknownFormParam => "Form-data parameter is invalid. Allowed: name, filename[*]",
-        }
-    }
 }
 
 impl FromStr for ContentDisposition {

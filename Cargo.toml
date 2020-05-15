@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.4"
+version = "1.0.5"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -41,7 +41,7 @@ serde = "1"
 serde_json = "1"
 cookie = "0.13"
 httpdate = "0.3"
-etag = "1"
+etag = "2"
 serde_urlencoded = "0.6"
 
 encoding_rs = { version = "0.8", optional = true }
