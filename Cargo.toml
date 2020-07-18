@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.5"
+version = "1.0.6"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -34,12 +34,12 @@ lazy_static = "1"
 tokio = { version = "0.2", features = ["net"] }
 
 sha-1 = { version = "0", optional = true }
-tokio-rustls = { version = "0.13", optional = true }
-webpki-roots = { version = "0.19", optional = true }
+tokio-rustls = { version = "0.14", optional = true }
+webpki-roots = { version = "0.20", optional = true }
 
 serde = "1"
 serde_json = "1"
-cookie = "0.13"
+cookie = "0.14"
 httpdate = "0.3"
 etag = "2"
 serde_urlencoded = "0.6"

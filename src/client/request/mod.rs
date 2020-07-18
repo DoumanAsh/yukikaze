@@ -133,8 +133,8 @@ impl Builder {
         //Workaround to get just Parts as it is more  convenient
         //to modify Parts as you can take out elements
         let mut temp = hyper::Request::<()>::new(());
-        mem::replace(temp.method_mut(), method);
-        mem::replace(temp.uri_mut(), uri);
+        *temp.method_mut() = method;
+        *temp.uri_mut() = uri;
 
         let (parts, _) = temp.into_parts();
 
