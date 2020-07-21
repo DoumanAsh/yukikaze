@@ -337,7 +337,7 @@ impl Response {
     }
 
 
-    ///Prepares upgrade for the request.
+    ///Finalize upgrade procedure, initiated from request, if any.
     pub async fn upgrade<U: upgrade::Upgrade>(self, _: U) -> Result<Result<(Self, hyper::upgrade::Upgraded), hyper::Error>, U::VerifyError> {
         if let Err(error) = U::verify_response(self.status(), self.inner.headers(), self.inner.extensions()) {
             return Err(error);

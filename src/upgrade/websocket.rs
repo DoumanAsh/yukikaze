@@ -1,4 +1,30 @@
 //! Websocket upgrade module
+//!
+//! ## Example
+//!
+//!```rust
+//!use yukikaze::{matsu, client};
+//!
+//!async fn do_ws_handshaske() -> hyper::upgrade::Upgraded {
+//!   const WS_TEST: &str = "http://echo.websocket.org/?encoding=text";
+//!
+//!   let request = client::request::Request::get(WS_TEST).expect("Error with request!")
+//!                                                       .upgrade(yukikaze::upgrade::WebsocketUpgrade, None);
+//!
+//!   let client = client::Client::default();
+//!
+//!   let result = matsu!(client.send(request));
+//!   let result = result.expect("To get without timeout");
+//!   let response = result.expect("To get without error");
+//!   assert!(response.is_upgrade());
+//!
+//!   let upgrade = matsu!(response.upgrade(yukikaze::upgrade::WebsocketUpgrade));
+//!   let (response, upgraded) = upgrade.expect("To validate upgrade").expect("To finish upgrade");
+//!   assert!(response.is_upgrade());
+//!
+//!   upgraded
+//!}
+//!```
 
 use core::ops::Deref;
 use std::error::Error;
