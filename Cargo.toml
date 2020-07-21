@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.7"
+version = "1.0.8"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -47,7 +47,6 @@ serde_urlencoded = "0.6"
 
 encoding_rs = { version = "0.8", optional = true }
 data-encoding = "2"
-getrandom = { version = "0", optional = true }
 
 derive_more = "0.99"
 async-timer = { version = "0.7", features = ["tokio_on"] }
@@ -62,7 +61,7 @@ rustls-on = ["tokio-rustls", "webpki-roots"]
 # Enables encoding/decoding of text content
 encoding = ["encoding_rs"]
 # Enables websocket upgrade
-websocket = ["ring", "getrandom", "carry_extensions"]
+websocket = ["ring", "carry_extensions"]
 # Specifies that documentation is being generated
 docs = ["compu/docs"]
 
