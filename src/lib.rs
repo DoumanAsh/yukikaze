@@ -75,8 +75,6 @@ pub extern crate async_timer;
 pub extern crate encoding_rs;
 #[cfg(feature = "compu")]
 pub extern crate compu;
-#[cfg(feature = "websocket")]
-pub extern crate sha1;
 pub extern crate hyper;
 pub extern crate etag;
 pub extern crate cookie;
