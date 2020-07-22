@@ -49,7 +49,7 @@
 ///
 ///Creates following:
 ///
-///- `GLOBAL_CLIENT` which is initialized using `lazy_static`
+///- `GLOBAL_CLIENT` which is wrapper struct that initializes client on first `deref`
 ///- `Request` which uses `GLOBAL_CLIENT` and wraps `yukikaze::client::Request`
 ///- Creates and defines trait `GlobalRequest` for generated `Request`.
 ///
@@ -62,10 +62,44 @@ macro_rules! declare_global_client {
         $crate::declare_global_client!(DefaultCfg);
     };
     ($config:ty) => {
-        $crate::lazy_static::lazy_static! {
-            ///Global client instance
-            pub static ref GLOBAL_CLIENT: $crate::client::Client::<$config> = $crate::client::Client::<$config>::new();
+        ///Wrapper over client, allowing to store it as a static variable, that performs
+        ///initialization on first `deref`
+        pub struct InitWrapper {
+            inner: core::cell::UnsafeCell<core::mem::MaybeUninit::<$crate::client::Client::<$config>>>,
         }
+
+        impl InitWrapper {
+            #[inline(always)]
+            #[doc(hidden)]
+            pub const fn new() -> Self {
+                Self {
+                    inner: core::cell::UnsafeCell::new(core::mem::MaybeUninit::uninit()),
+                }
+            }
+        }
+
+        unsafe impl core::marker::Sync for InitWrapper {}
+
+        impl core::ops::Deref for InitWrapper {
+            type Target = $crate::client::Client::<$config>;
+            fn deref(&self) -> &Self::Target {
+                static INIT: std::sync::Once = std::sync::Once::new();
+                let write_ptr = unsafe {
+                    (*self.inner.get()).as_mut_ptr()
+                };
+
+                INIT.call_once(|| unsafe {
+                    core::ptr::write(write_ptr, $crate::client::Client::<$config>::new())
+                });
+
+                unsafe {
+                    &*(*self.inner.get()).as_ptr()
+                }
+            }
+        }
+
+        ///Global instance wrapper, performs initialization on first dereference
+        pub static GLOBAL_CLIENT: InitWrapper = InitWrapper::new();
 
         ///Global request
         ///

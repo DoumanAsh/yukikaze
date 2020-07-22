@@ -65,7 +65,6 @@ pub mod client;
 pub mod rt;
 
 pub extern crate mime;
-pub extern crate lazy_static;
 pub extern crate bytes;
 pub extern crate http;
 pub extern crate http_body;

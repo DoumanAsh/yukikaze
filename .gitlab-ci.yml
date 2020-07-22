@@ -9,5 +9,6 @@ test:cargo:
         - cargo check --no-default-features
         - cargo check
         - cargo check --features encoding,websocket,docs
+        - cargo test --doc
         - cargo test
         - cargo test websocket --features websocket

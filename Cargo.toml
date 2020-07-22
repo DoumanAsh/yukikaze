@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.8"
+version = "1.0.9"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -29,7 +29,6 @@ bytes = "0.5"
 mime = "0.3"
 mime_guess = "2"
 compu = { version = "0.5.1", optional = true, default-features = false, features = ["brotli-c", "zlib"] }
-lazy_static = "1"
 
 tokio = { version = "0.2", features = ["net"] }
 
