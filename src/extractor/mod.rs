@@ -5,6 +5,7 @@
 use std::{string, io};
 use std::error::Error;
 use std::fs;
+use core::fmt;
 
 mod notify;
 mod cookie;
@@ -14,38 +15,46 @@ pub use self::cookie::CookieIter;
 pub use notify::{Notifier, Noop};
 pub use body::{*};
 
-#[derive(Debug, derive_more::Display)]
+#[derive(Debug)]
 ///Describes possible errors when reading body.
 pub enum BodyReadError {
-    #[display(fmt = "Read limit is reached. Aborted reading.")]
     ///Hits limit, contains already read data.
     Overflow(bytes::Bytes),
-    #[display(fmt = "Unable to decode content into UTF-8")]
     ///Unable to decode body as UTF-8
     EncodingError,
-    #[display(fmt = "Failed to extract JSON. Error: {}", "_0")]
     ///Json serialization error.
     JsonError(serde_json::error::Error),
     #[cfg(feature = "compu")]
-    #[display(fmt = "Failed to decompress content. Error: {:?}", "_0")]
     ///Error happened during decompression.
     CompuError(compu::decoder::DecoderResult),
-    #[display(fmt = "Failed to decompress content as it is not complete")]
     ///Failed to decompress content as it is not complete.
     IncompleteDecompression,
-    #[display(fmt = "Error file writing response into file. Error: {}", "_1")]
     ///Error happened when writing to file.
     FileError(fs::File, io::Error),
-    #[display(fmt = "IO Error while reading: {}", "_0")]
     ///Some IO Error during reading
     ///
     ///Convertion from `io::Error` creates this  variant
     ReadError(io::Error),
-    #[display(fmt = "Failed to read due to HTTP error: {}", "_0")]
     ///Hyper's error.
     ///
     ///Disabled when `client` feature is not enabled
     Hyper(hyper::Error),
+}
+
+impl fmt::Display for BodyReadError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BodyReadError::Overflow(_) => f.write_str("Read limit is reached. Aborted reading."),
+            BodyReadError::EncodingError => f.write_str("Unable to decode content into UTF-8"),
+            BodyReadError::JsonError(err) => write!(f, "Failed to extract JSON. Error: {}", err),
+            #[cfg(feature = "compu")]
+            BodyReadError::CompuError(err) => write!(f, "Failed to decompress content. Error: {:?}", err),
+            BodyReadError::IncompleteDecompression => f.write_str("Failed to decompress content as it is not complete"),
+            BodyReadError::FileError(_, err) => write!(f, "Error file writing response into file. Error: {}", err),
+            BodyReadError::ReadError(err) => write!(f, "IO Error while reading: {}", err),
+            BodyReadError::Hyper(err) => write!(f, "Failed to read due to HTTP error: {}", err),
+        }
+    }
 }
 
 impl From<serde_json::error::Error> for BodyReadError {

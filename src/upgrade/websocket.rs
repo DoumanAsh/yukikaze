@@ -26,6 +26,7 @@
 //!}
 //!```
 
+use core::fmt;
 use core::ops::Deref;
 use std::error::Error;
 
@@ -41,24 +42,37 @@ pub const WEBSOCKET_VERSION: usize = 13;
 ///GUID used for websocket challenge by server.
 pub const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-#[derive(Debug, derive_more::From, derive_more::Display)]
+#[derive(Debug)]
 ///Websocket upgrade errors
 pub enum WebsocketUpgradeError {
-    #[display(fmt = "Invalid status code of response. Should be 101, but got {}", "_0")]
     ///Unexpected Status code
     InvalidStatus(http::StatusCode),
-    #[display(fmt = "Invalid upgrade type for Websocket protocol")]
     ///Unexpected type of upgrade
     InvalidUpgradeType,
-    #[display(fmt = "Invalid Connection Header")]
     ///Unexpected Connection header
     InvalidConnectionHeader,
-    #[display(fmt = "Sec-Websocket-Accept header is missing")]
     ///Sec-Websocket-Accept header is missing
     MissingChallenge,
-    #[display(fmt = "Sec-Websocket-Accept has invalid challenge")]
     ///Sec-Websocket-Accept has invalid challenge.
     InvalidChallenge,
+}
+
+impl fmt::Display for WebsocketUpgradeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WebsocketUpgradeError::InvalidStatus(code) => write!(f, "Invalid status code of response. Should be 101, but got {}", code),
+            WebsocketUpgradeError::InvalidUpgradeType => f.write_str("Invalid upgrade type for Websocket protocol"),
+            WebsocketUpgradeError::InvalidConnectionHeader => f.write_str("Invalid Connection Header"),
+            WebsocketUpgradeError::MissingChallenge => f.write_str("Sec-Websocket-Accept header is missing"),
+            WebsocketUpgradeError::InvalidChallenge => f.write_str("Sec-Websocket-Accept has invalid challenge"),
+        }
+    }
+}
+
+impl From<http::StatusCode> for WebsocketUpgradeError {
+    fn from(code: http::StatusCode) -> Self {
+        WebsocketUpgradeError::InvalidStatus(code)
+    }
 }
 
 impl Error for WebsocketUpgradeError {}

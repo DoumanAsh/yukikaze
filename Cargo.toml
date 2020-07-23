@@ -1,6 +1,6 @@
 [package]
 name = "yukikaze"
-version = "1.0.9"
+version = "1.0.10"
 authors = ["Douman <douman@gmx.se>"]
 description = "Beautiful and elegant HTTP library."
 readme = "README.md"
@@ -47,7 +47,6 @@ serde_urlencoded = "0.6"
 encoding_rs = { version = "0.8", optional = true }
 data-encoding = "2"
 
-derive_more = "0.99"
 async-timer = { version = "0.7", features = ["tokio_on"] }
 
 [package.metadata.docs.rs]
